@@ -77,7 +77,7 @@ On the topic of client validation of encrypted DNS transports, the DDR specifica
 
 As TLS certificates cannot cover private IP addresses, this prevents clients that are behind a legacy DNS forwarder from connecting directly to the upstream resolver ("cross-forwarder upgrade").
 
-Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR.
+Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR.  It seems likely that most of these forwarders will never gain DDR support, which requires operating an encrypted DNS server, even if they are still receiving security updates.
 
 ## Scope
 
@@ -86,6 +86,8 @@ This informational document describes the interaction between DDR and legacy DNS
 DNS forwarders and resolvers that are implemented with awareness of DDR are out of scope, as they are not affected by this discussion (although see Security Considerations, {{security-considerations}}).
 
 IPv6-only networks whose default DNS server has a Global Unicast Address are out of scope, even if this server is actually a simple forwarder.  If the DNS server does not use a private IP address, it is not a "legacy DNS forwarder" under this draft's definition.
+
+When legacy DNS forwarders as described here cease to be widely deployed, this draft will no longer be relevant, and should be moved to "historic" status.
 
 # Relaxed Validation client policy {#client-policy}
 
@@ -145,7 +147,7 @@ Solving or mitigating this attack is of great importance for the user's security
 
 This attack does not apply if the client and network implement support for Discovery of Network-designated Resolvers, as that mechanism takes precedence over DDR (see {{Section 3.2 of ?DNR=I-D.draft-ietf-add-dnr}}).
 
-### Mitigation: Frequent refresh
+### Mitigation: Frequent refresh {#frequent-refresh}
 
 The client can choose to refresh the DDR record arbitrarily frequently, e.g. by limiting the TTL.  For example, by limiting the TTL to 5 minutes, a client could ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
 
@@ -154,6 +156,8 @@ The client can choose to refresh the DDR record arbitrarily frequently, e.g. by 
 A relaxed-validation client might choose to accept a potential cross-forwarder upgrade only if the designated encrypted resolver has sufficient reputation, according to some proprietary reputation scheme (e.g. a locally stored list of respectable resolvers).  This limits the ability of a DDR forgery attack to cause harm.
 
 Major DoH client implementations already include lists of known resolvers {{CHROME-DOH}}{{MICROSOFT-DOH}}{{MOZILLA-TRR}}.
+
+Reputation systems might also be combined with other relevant mitigations.  For example, unrecognized resolvers might be permitted subject to frequent refresh ({{frequent-refresh}}) or user confirmation ({{user-controls}}).
 
 ## Forensic logging
 
