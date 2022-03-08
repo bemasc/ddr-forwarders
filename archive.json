@@ -1,0 +1,221 @@
+{
+  "magic": "E!vIA5L86J2I",
+  "timestamp": "2021-10-24T01:07:31.582192+00:00",
+  "repo": "bemasc/ddr-forwarders",
+  "labels": [
+    {
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "name": "documentation",
+      "description": "Improvements or additions to documentation",
+      "color": "0075ca"
+    },
+    {
+      "name": "duplicate",
+      "description": "This issue or pull request already exists",
+      "color": "cfd3d7"
+    },
+    {
+      "name": "enhancement",
+      "description": "New feature or request",
+      "color": "a2eeef"
+    },
+    {
+      "name": "help wanted",
+      "description": "Extra attention is needed",
+      "color": "008672"
+    },
+    {
+      "name": "good first issue",
+      "description": "Good for newcomers",
+      "color": "7057ff"
+    },
+    {
+      "name": "invalid",
+      "description": "This doesn't seem right",
+      "color": "e4e669"
+    },
+    {
+      "name": "question",
+      "description": "Further information is requested",
+      "color": "d876e3"
+    },
+    {
+      "name": "wontfix",
+      "description": "This will not be worked on",
+      "color": "ffffff"
+    }
+  ],
+  "issues": [
+    {
+      "number": 1,
+      "id": "I_kwDOF_MZgc47lytC",
+      "title": "Various comments on reviewing draft",
+      "url": "https://github.com/bemasc/ddr-forwarders/issues/1",
+      "state": "CLOSED",
+      "author": "ericorth",
+      "authorAssociation": "NONE",
+      "assignees": [],
+      "labels": [],
+      "body": "2.1: \"Recent estimates suggest...\" Any ideas on a formal citation for this point? (I recognize that this is probably just acknowledging public but informal comments on the matter from Chrome, but it would be great if a similar point is made somewhere more formal that this draft could point to.)\r\n\r\n6: I don't think this section goes into enough detail for somebody not already familiar with these issues to really understand the problem and the stuff that's not as bad as initially seems.  E.g., needs to more verbosely state that (in strict or relaxed) when an on-path attacker can intercept and manipulate queries/responses pre-upgrade, they can then easily block/manipulate DDR responses to prevent upgrade and continue mucking with the non-upgraded unecrypted requests/responses to have complete attacker visibility to DNS requests and control over DNS results.  Need to make clear that the only effective security difference is that only relaxed mode can trick client into doing an \"upgrade\" when it shouldn't and that the attacker can control the target of that \"upgrade\".\r\n\r\n6.1.3: Should we point to Chrome and Firefox providers lists as an example of what a reputable provider list would look like? Seems especially relevant since being on one of those lists or similar is likely to actually be the mechanism used by prominent clients.\r\n\r\n7: General solution for all these compatibility issues: I think we should note that clients may choose to involve user input before doing upgrade to allow the user to avoid upgrade if an incompatibility is known.  E.g., prompt the user before upgrade, or use the DDR signal only to add options to user-opt-in configuration UX.  Especially relevant since using the signal primarily to impact a configuration UX is what I have proposed for the initial Chrome behavior, to be followed later by autoupgrade once some time has passed in order to spread the message that behavior will change and parties will need to add resolver.arpa to their block lists if necessary.\r\n\r\n7.1.1: Mostly just curiosity: Why does Firefox get the only citation for this behavior when Chrome essentially does the same thing by default in its current DoH autoupgrade?\r\n\r\n7.3: Yeah, we need this section because otherwise somebody is bound to bring it up, but I remain unconvinced that this is actually an issue in practice (especially given my next comment on 7.3.1).  Can we maybe comment that it is unclear how much impact the caching actually has, maybe to see if anybody in ADD comments with any citations on the matter?\r\n\r\n7.3.1: Are there any DNS clients that don't already maintain at least a basic cache.  Probably worth noting that this mitigation is already widely deployed.",
+      "createdAt": "2021-09-17T22:27:28Z",
+      "updatedAt": "2021-09-21T18:52:47Z",
+      "closedAt": "2021-09-21T18:52:46Z",
+      "comments": [
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "Thanks, I've incorporated most of those changes [here](https://github.com/bemasc/ddr-forwarders/commit/356b7c1f8f02fda4bf0a14bf306c5086a29ad445?short_path=1dd9b41#diff-1dd9b41c1d07a52069cc813ecb21901ad48aa5fd4b5cccf6c664930d42e92449).\r\n\r\n> 2.1: \"Recent estimates suggest...\" Any ideas on a formal citation for this point?\r\n\r\nNope, I haven't found a good source.\r\n\r\n> 7.1.1: Mostly just curiosity: Why does Firefox get the only citation for this behavior when Chrome essentially does the same thing by default in its current DoH autoupgrade?\r\n\r\nI wasn't aware of any NXDOMAIN fallback in Chrome.  Is this documented somewhere?",
+          "createdAt": "2021-09-20T17:42:44Z",
+          "updatedAt": "2021-09-20T17:42:44Z"
+        },
+        {
+          "author": "ericorth",
+          "authorAssociation": "NONE",
+          "body": "> > 7.1.1: Mostly just curiosity: Why does Firefox get the only citation for this behavior when Chrome essentially does the same thing by default in its current DoH autoupgrade?\r\n> \r\n> I wasn't aware of any NXDOMAIN fallback in Chrome. Is this documented somewhere?\r\n\r\nIn the default autoupgrade mode (as opposed to when users/admins have selected a specific DoH provider), Chrome will retry with Do53 any time it fails to find any results for a query, including on NXDOMAIN.  This is kinda mentioned (although not super clearly) here: https://blog.chromium.org/2020/05/a-safer-and-more-private-browsing-DoH.html (second paragraph under \"Responsibly deploying DNS-over-HTTPS\")\r\n\r\nThis has been a very successful mitigation for any cases where Chrome's autoupgrade behavior would have otherwise messed with enterprises relying on interception to enable split-horizon behavior.  I have only seen one or two bugs from enterprises broken with a setup relying on split-horizoning a domain name with separate local and global records.",
+          "createdAt": "2021-09-21T15:54:09Z",
+          "updatedAt": "2021-09-21T15:54:09Z"
+        },
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "OK, good to know.  Interestingly, without NXDOMAIN fallback, even baseline DDR would break that use case.\r\n\r\nDraft 00 is now out.  Thanks for improving it!",
+          "createdAt": "2021-09-21T18:52:46Z",
+          "updatedAt": "2021-09-21T18:52:46Z"
+        }
+      ]
+    }
+  ],
+  "pulls": [
+    {
+      "number": 2,
+      "id": "PR_kwDOF_MZgc4sk_oa",
+      "title": "Add text from Chris's analysis",
+      "url": "https://github.com/bemasc/ddr-forwarders/pull/2",
+      "state": "MERGED",
+      "author": "bemasc",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "",
+      "createdAt": "2021-10-01T19:42:45Z",
+      "updatedAt": "2021-10-06T15:13:47Z",
+      "baseRepository": "bemasc/ddr-forwarders",
+      "baseRefName": "main",
+      "baseRefOid": "a5e58f6b1bb36f4ce7ef539bb5fe95694cf74dc7",
+      "headRepository": "bemasc/ddr-forwarders",
+      "headRefName": "bemasc-cb",
+      "headRefOid": "e33c7f7f76fdf70e146b9337361ed2e75577fd91",
+      "closedAt": "2021-10-06T15:13:43Z",
+      "mergedAt": "2021-10-06T15:13:43Z",
+      "mergedBy": "bemasc",
+      "mergeCommit": {
+        "oid": "f04ecbaa46ca1a2bbbf5d0e1703169065222a73f"
+      },
+      "comments": [
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "@chris-box Please review this proposed change based on your comments.",
+          "createdAt": "2021-10-01T19:44:16Z",
+          "updatedAt": "2021-10-01T19:44:16Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "Ben,\r\n\r\nThanks for the suggested changes!\r\n\r\nI personally read the -00 draft as saying that relaxed validation meant the removal of checking that the IP address is covered by SubjectAlternativeName.\r\n\r\nHowever in this commit, your intent appears to be go further, to define it as the removal of all mandatory validation processes, leaving only optional ones. \r\n\r\nFrom a client's perspective, I think there is merit in validating that the upstream encrypted DNS it has just connected to is provably operated by a named entity. This information can be used in deciding when to use this DNS (always/never/somewhere in between), and in generating UI messages (e.g. \"upstreamisp.com has stopped responding\").\r\n\r\nOpportunistic Privacy Profile says the client \"might or might not validate the resolver\". If we agree there is some merit in knowing who you are talking to, then I propose to define relaxed validation as:\r\n* Validate the encrypted resolver's certificate is signed by a chain we trust\r\n* But do not require the IP address to be listed in the certificate\r\n\r\nDoes that make sense? If the encrypted resolver fails validation (e.g. self-signed) then I guess some clients might be happy to proceed regardless. But I'd be more comfortable setting an expectation that upstream encrypted resolvers should always be properly signed according to the client's trust store.",
+          "createdAt": "2021-10-05T14:05:20Z",
+          "updatedAt": "2021-10-05T14:05:20Z"
+        },
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "That's an interesting observation.  This is an Informational draft, so we aren't in the business of imposing requirements, but we should definitely talk about certificate validation and how it can be beneficial.  I've added a paragraph here discussing why it might be a good idea for clients to validate certificate chains, which connects nicely with some of the mitigations later on.\r\n\r\nPlease review.",
+          "createdAt": "2021-10-05T15:34:56Z",
+          "updatedAt": "2021-10-05T15:34:56Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "Agree in principle with the extra paragraph and links to the mitigations. It is objectively correct.\r\n\r\nHowever when reading it with an implementer's eye, I am concerned they will be put off by \"conveys minimal security benefit on its own\". The tone suggests disapproval and the subsequent words are not sufficient to remove this sense.\r\n\r\nHow about removing those words? The resulting paragraph strikes a better tone and still conveys the right information (IMHO):\r\n\r\n`The Opportunistic Privacy Profile is a broad category, including clients that \"might or might not validate\" the TLS certificate chain.  Certificate validation without an authentication identity can be valuable in conjunction with a reputation system or a user approval step (see {{reputation}} and {{user-controls}}).`\r\n\r\n",
+          "createdAt": "2021-10-05T16:54:37Z",
+          "updatedAt": "2021-10-05T16:54:37Z"
+        },
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "OK, I've removed those words and rearranged the words a bit.",
+          "createdAt": "2021-10-05T17:06:08Z",
+          "updatedAt": "2021-10-05T17:06:08Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "Looks even better, thanks. I do also want to comment on the second half of the first commit but I'll do that tomorrow.",
+          "createdAt": "2021-10-05T19:03:00Z",
+          "updatedAt": "2021-10-05T19:03:00Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "In section 4 I would like to change a couple of areas. I'm not sure if I can submit a pull request into a pull request, so instead I'll set out my proposed wording here.\r\n\r\n```\r\n# Naturally compatible behaviors\r\n\r\nThe following network behaviors are naturally compatible with relaxed validation. The first\r\nthree are concerned with cases where they are implemented on the Legacy DNS Forwarder, with\r\nthe final one considering the upstream resolver.\r\n```\r\n\r\n```\r\n## Upstream resolver services\r\n\r\nThe forwarder's upstream resolver might provide additional services, such as filtering.\r\nThese services are generally independent of cross-forwarder upgrade, and hence naturally\r\ncompatible.\r\n\r\nIn special cases where the upstream resolver requires cooperation from a legacy forwarder\r\n(e.g. for marking certain queries), one solution is for the upstream resolver to choose\r\nnot to deploy DDR until all cooperating forwarders have been upgraded. Alternatively,\r\neach legacy forwarder can block \"resolver.arpa\" as described above.\r\n```\r\n\r\nThe first one of these seeks to clarify that the network behaviours discussed here are mostly forwarder behaviours.\r\n\r\nThe second one removes query logging (because I think it is rare), states things in a different way, and notes an alternative solution to the last problem.\r\n",
+          "createdAt": "2021-10-06T13:54:27Z",
+          "updatedAt": "2021-10-06T13:54:27Z"
+        },
+        {
+          "author": "bemasc",
+          "authorAssociation": "OWNER",
+          "body": "OK, I've incorporated your text on upstream services.  Instead of discussing the different scopes in text, I've split this section into \"local\" and \"upstream\" subsections.",
+          "createdAt": "2021-10-06T14:29:25Z",
+          "updatedAt": "2021-10-06T14:29:25Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "That works for me!",
+          "createdAt": "2021-10-06T15:11:59Z",
+          "updatedAt": "2021-10-06T15:11:59Z"
+        },
+        {
+          "author": "chris-box",
+          "authorAssociation": "NONE",
+          "body": "That works for me!",
+          "createdAt": "2021-10-06T15:12:19Z",
+          "updatedAt": "2021-10-06T15:12:19Z"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 3,
+      "id": "PR_kwDOF_MZgc4s0Wrq",
+      "title": "Improvements based on comments from Barbara Stark",
+      "url": "https://github.com/bemasc/ddr-forwarders/pull/3",
+      "state": "MERGED",
+      "author": "bemasc",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "",
+      "createdAt": "2021-10-06T15:46:17Z",
+      "updatedAt": "2021-10-22T15:48:08Z",
+      "baseRepository": "bemasc/ddr-forwarders",
+      "baseRefName": "main",
+      "baseRefOid": "f04ecbaa46ca1a2bbbf5d0e1703169065222a73f",
+      "headRepository": "bemasc/ddr-forwarders",
+      "headRefName": "bemasc-stark",
+      "headRefOid": "1f0a89b0dc79c7d5018669c3ad08f08b9574ef61",
+      "closedAt": "2021-10-22T15:48:04Z",
+      "mergedAt": "2021-10-22T15:48:04Z",
+      "mergedBy": "bemasc",
+      "mergeCommit": {
+        "oid": "6f9868a570ba320192bffd9422039a9160942727"
+      },
+      "comments": [],
+      "reviews": []
+    }
+  ]
+}
