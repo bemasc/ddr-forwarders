@@ -2,7 +2,7 @@
 title: "Reputation Verified Selection of Upstream Encrypted Resolvers"
 abbrev: "DDR and Forwarders"
 docname: draft-schwartz-add-ddr-forwarders-latest
-category: info
+category: std
 
 ipr: trust200902
 area: General
@@ -49,9 +49,6 @@ informative:
   MICROSOFT-DOH:
     target: https://docs.microsoft.com/en-us/windows-server/networking/dns/doh-client-support#determine-which-doh-servers-are-on-the-known-server-list
     title: Determine which DoH servers are on the known server list
-  NEXTDNS:
-    target: https://nextdns.io/
-    title: NextDNS
 
 
 
@@ -90,6 +87,8 @@ IPv6-only networks whose default DNS server has a Global Unicast Address are out
 
 # Conventions and Definitions
 
+{::boilerplate bcp14-tagged}
+
 Private IP Address - Any IP address reserved for loopback {{?RFC1122}}, link-local {{?RFC3927}}, private {{?RFC1918}}, local {{?RFC4193}}, or Carrier-Grade NAT {{?RFC6598}} use.
 
 Legacy DNS Forwarder - An apparent DNS resolver, known to the client only by a private IP address, that forwards the client's queries to an upstream resolver, and has not been updated with any knowledge of DDR.
@@ -103,10 +102,13 @@ Reputation Verified Selection (RVS) is a method for validating whether connectio
 1. The client connects to one of the indicated Encrypted DNS endpoints.
 1. The client receives a certificate, which it verifies to a suitable root of trust.
 1. For each identity (e.g. SubjectAltName) in the certificate, the client constructs a Resolver Identity:
-  a. For DNS over TLS and DNS over QUIC, the Resolver Identity is an IP address or hostname and the port number used for the connection.
-  b. For DNS over HTTPS, the Resolver Identity is a URI Template in absolute form, containing the port number used for the connection and path indicated by `dohpath`.
+
+    * For DNS over TLS and DNS over QUIC, the Resolver Identity is an IP address or hostname and the port number used for the connection.
+    * For DNS over HTTPS, the Resolver Identity is a URI Template in absolute form, containing the port number used for the connection and path indicated by `dohpath`.
 1. The client determines the reputation of each Resolver Identity derived from the certificate.
 1. The maximum (i.e. most favorable) reputation is the reputation of this connection.
+
+Successful validation then permits cross-forwarder upgrade.
 
 > OPEN QUESTION: Would it be better to use the SVCB TargetName to select a single Resolver Identity?  This would avoid the need to enumerate the certificate's names, but it would require the use of SNI (unlike standard DDR), and would not be compatible with all upstream encrypted resolvers.
 
@@ -118,19 +120,13 @@ For DNS over HTTPS, the `:authority` pseudo-header MUST reflect the Resolver Ide
 
 Assessing reputation limits the ability of a DDR forgery attack to cause harm, as it will only allow an attacker to direct clients to a resolver they consider trustworthy. Major DoH client implementations already include lists of known or trusted resolvers {{CHROME-DOH}}{{MICROSOFT-DOH}}{{MOZILLA-TRR}}.
 
-If no resolvers pass the reputation check, the client must not proceed.
-
 Clients SHOULD start by checking the resolver endpoint with the numerically lowest SVCB SvcPriority.  Clients MAY wait until a DNS query triggers an Encrypted DNS connection attempt before performing this verification.
 
-If RVS encounters an error or rejects the server, the client MUST fall back to plaintext DNS on port 53.
-
-Successful validation then permits cross-forwarder upgrade.
+If RVS encounters an error or rejects the server, the client MUST NOT send encrypted DNS queries to that server.  If RVS rejects all compatible ServiceMode records, the client MUST fall back to the unencrypted resolver (i.e. plaintext DNS on port 53).
 
 ## Reputation systems {#reputation-systems}
 
 Embedding a list of known trusted resolvers in a client is only one possible model for assessing the reputation of a resolver. In future a range of online reputation services might be available to be queried, each returning an answer according to their own specific criteria. These might involve answers on other properties such as jurisdiction, or certification by a particular body. It is out of scope for this document to define these query methods, other than to note that designers should be aware of bootstrapping problems. It is the client's decision as to how to combine these answers, possibly using additional metadata (e.g. location), to make a determination of reputation.
-
-
 
 ## Using resolvers of intermediate reputation
 
@@ -138,9 +134,9 @@ If the determined reputation is a binary "definitely trustworthy" or "definitely
 
 The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.
 
-The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to convey information about why the ADN lacks some element of reputation.
+The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to present more details about why a Resolver Identity lacks some element of reputation.
 
-The client can also use the encrypted service for a limited time, as a means of mitigating. By limiting the DDR response TTL to 5 minutes, a client can ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
+The client can also use the encrypted service for a limited time, as a means of mitigating interception attacks.  For example, if the client limiting the DDR response TTL to 5 minutes, this ensures that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
 
 # Management of local blocking functionality
 
@@ -198,35 +194,51 @@ Clients can compensate partially for any loss of shared caching by implementing 
 
 # Privacy Considerations
 
+## Privacy gains
+
 The conservative validation policy results in no encryption when a legacy DNS forwarder is present.  This leaves the user's query activity vulnerable to passive monitoring {{?RFC7258}}, either on the local network or between the user and the upstream resolver.
 
-Reputation Validated Selection enables the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.
+Reputation Verified Selection enables the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.
+
+## Privacy losses
+
+In some legacy DNS forwarder implementations, the upstream resolver is not able to determine whether two queries were issued by the same client inside the network. It can only see aggregated queries being made by the forwarder. {{DDR}} to a non-local resolver requires individual encrypted DNS connections from each device, revealing which queries were made by the same client. RVS shares this property.
+
+### Mitigation: Open multiple connections
+
+If the above issue is a concern, clients MAY open multiple connections to the designated encrypted resolver with separate local state (e.g. TLS session tickets), and distribute queries among them. This may reduce the upstream resolver's ability to link queries that came from a single client.
 
 # Security Considerations {#security-considerations}
 
 When the client uses the conservative validation policy described in {{DDR}}, the client can establish a secure DDR connection only in the absence of an active attacker.  An on-path attacker can impersonate the resolver and intercept all queries, by preventing the DDR upgrade.
 
-This basic security property also applies if the client uses reputation validated selection, but an additional one is added.
+This basic security analysis also applies if the client uses Reputation Verified Selection.  However, the detailed security properties differ, as discussed in this section.
 
 ## Redirection
 
-An on-path attacker might be located on the local network, or between the local network and the upstream resolver. In either case, the attacker can redirect the client to a resolver of the attacker's choice, /as long as that resolver meets the client's requirements for reputation/. Hence the reputation system is essential to the security of the user. If a previously-reputable resolver is compromised, users can be redirected to it while this reputation remains high.
+An on-path attacker might be located on the local network, or between the local network and the upstream resolver. In either case, the attacker can redirect the client to a resolver of the attacker's choice, _as long as that resolver meets the client's requirements for reputation_. Hence the reputation system is essential to the security of the user.
 
-### Mitigation: Reputation update
+Weaknesses in the reputation system could reopen this class of vulnerabilities.
 
-Once an attack has been detected, it should be reported to relevant reputation services so that they can revise their assessment of the ADN.
+### Possible weakness: Stale reputation
+
+If a previously-reputable resolver is compromised, users can be redirected to it while this reputation remains high.  Once an attack has been detected, it should be reported to relevant reputation services so that they can revise their assessment of this resolver.
+
+### Possible weakness: Inappropriate reputation
+
+The reputation of a resolver might depend on aspects of the client's connection context, e.g. their geographic location.  For example, a local ISP's resolver could be reputable for clients in its service area, but suspicious for clients on distant continent.  Accordingly, very large reputation systems may need to customize their results based on the context.
 
 ## Forensic logging
 
 ### Network-layer logging
 
-With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of an active attack.
+With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of a DNS redirection attack.
 
-With reputation verified selection, forensic logs must capture a specific packet (the attacker’s DDR designation response) to enable retrospective detection.
+With Reputation Verified Selection, local forensic logs must capture a specific packet (the attacker’s DDR designation response) to enable retrospective detection of a redirection attack.
 
-#### Mitigation: Log all DDR responses
+#### Additional Mitigation: Log all DDR responses
 
-Network-layer forensic logs that are not integrated with the resolver can enable detection of these attacks by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.
+Redirection attacks are largely mitigated by RVS, but the loss of network-layer logging for such attacks can be mitigated by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.
 
 ### DNS-layer logging
 
@@ -234,16 +246,7 @@ DNS-layer forensic logging conducted by a legacy DNS forwarder would be lost in 
 
 #### Solution: Plan to upgrade
 
-Forwarders that want to observe all queries from RVS clients should plan to implement DDR or DNR. In the short term it is possible for the forwarder to disable DDR by responding negatively to _dns.resolver.arpa but this is not recommended long-term as it prevents confidentiality protection.
-
-## Per-device observation
-
-With Do53 to a legacy DNS forwarder, an on-path attacker located between the local network and the upstream resolver is not directly aware of how many devices are making DNS queries behind the forwarder. It can only see aggregated queries being made by the forwarder. {{DDR}} to a non-local resolver permits the attacker to become aware of the individual encrypted DNS connections from each device, noting how many there are and the relative number of queries/responses made for each. RVS shares this property.
-
-### Mitigation: Open multiple connections
-
-If the above issue is a concern, clients may wish to open a random number of connections to the designed encrypted resolver and distribute queries among them. This may lead the attacker to assume a larger number of devices than are actually present.
-
+Forwarders that want to observe all queries from RVS clients should plan to implement DDR or DNR. In the short term it is possible for the forwarder to disable DDR by responding negatively to _dns.resolver.arpa, but this is not recommended long-term as it prevents confidentiality protection.
 
 --- back
 
