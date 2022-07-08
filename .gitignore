@@ -11,6 +11,7 @@ report.xml
 .targets.mk
 *.txt
 *.upload
+.vscode/
 venv/
 lib
 draft-schwartz-add-ddr-forwarders.xml
