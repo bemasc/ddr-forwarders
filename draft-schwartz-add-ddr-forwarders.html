@@ -1164,7 +1164,7 @@ svg :is([stroke="fill"], [fill^="#fff"]) {
             </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
-            <p id="section-toc.1-1.5.1"><a href="#section-5" class="xref">5</a>.  <a href="#name-other-issues-that-can-arise" class="xref">Other issues that can arise from cross-forwarder upgrade</a></p>
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="xref">5</a>.  <a href="#name-compatibility-issues-that-c" class="xref">Compatibility issues that can arise from cross-forwarder upgrade</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.1">
                 <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="xref">5.1</a>.  <a href="#name-split-horizon-namespaces" class="xref">Split-horizon namespaces</a></p>
@@ -1358,10 +1358,15 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
         <h3 id="name-using-resolvers-of-intermed">
 <a href="#section-3.2" class="section-number selfRef">3.2. </a><a href="#name-using-resolvers-of-intermed" class="section-name selfRef">Using resolvers of intermediate reputation</a>
         </h3>
-<p id="section-3.2-1">If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider.<a href="#section-3.2-1" class="pilcrow">¶</a></p>
-<p id="section-3.2-2">The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.<a href="#section-3.2-2" class="pilcrow">¶</a></p>
-<p id="section-3.2-3">The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to present more details about why a Resolver Identity lacks some element of reputation.<a href="#section-3.2-3" class="pilcrow">¶</a></p>
-<p id="section-3.2-4">The client can also use the encrypted service for a limited time, as a means of mitigating interception attacks.  For example, if the client limiting the DDR response TTL to 5 minutes, this ensures that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.<a href="#section-3.2-4" class="pilcrow">¶</a></p>
+<p id="section-3.2-1">If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider:<a href="#section-3.2-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-3.2-2.1">The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.<a href="#section-3.2-2.1" class="pilcrow">¶</a>
+</li>
+          <li class="normal" id="section-3.2-2.2">The client can ask the user about a specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to present more details about why a Resolver Identity lacks some element of reputation.<a href="#section-3.2-2.2" class="pilcrow">¶</a>
+</li>
+          <li class="normal" id="section-3.2-2.3">The client can use the encrypted service for a limited time, as a means of mitigating interception attacks.  For example, if the client limits the DDR response TTL to 5 minutes, this ensures that any attacker can continue to redirect queries for at most 5 minutes after they have left the local network.<a href="#section-3.2-2.3" class="pilcrow">¶</a>
+</li>
+        </ul>
 </section>
 </div>
 </section>
@@ -1399,18 +1404,18 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 </div>
 </section>
 </div>
-<div id="other-issues-that-can-arise-from-cross-forwarder-upgrade">
+<div id="compatibility-issues-that-can-arise-from-cross-forwarder-upgrade">
 <section id="section-5">
-      <h2 id="name-other-issues-that-can-arise">
-<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-other-issues-that-can-arise" class="section-name selfRef">Other issues that can arise from cross-forwarder upgrade</a>
+      <h2 id="name-compatibility-issues-that-c">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-compatibility-issues-that-c" class="section-name selfRef">Compatibility issues that can arise from cross-forwarder upgrade</a>
       </h2>
-<p id="section-5-1">There are a small number of other issues to be aware of. For all these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.<a href="#section-5-1" class="pilcrow">¶</a></p>
+<p id="section-5-1">Legacy DNS forwarders sometimes provide various additional services that would be lost in the event of a cross-forwarder upgrade. For all of these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.<a href="#section-5-1" class="pilcrow">¶</a></p>
 <div id="split-horizon-namespaces">
 <section id="section-5.1">
         <h3 id="name-split-horizon-namespaces">
 <a href="#section-5.1" class="section-number selfRef">5.1. </a><a href="#name-split-horizon-namespaces" class="section-name selfRef">Split-horizon namespaces</a>
         </h3>
-<p id="section-5.1-1">Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients should be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.1-1">Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients <span class="bcp14">SHOULD</span> be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
 <div id="mitigation-nxdomain-fallback">
 <section id="section-5.1.1">
           <h4 id="name-mitigation-nxdomain-fallbac">
