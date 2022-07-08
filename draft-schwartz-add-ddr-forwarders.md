@@ -1,12 +1,12 @@
 ---
-title: "Discovery of Designated Resolvers in the Presence of Legacy Forwarders"
+title: "Reputation Verified Selection of Upstream Encrypted Resolvers"
 abbrev: "DDR and Forwarders"
 docname: draft-schwartz-add-ddr-forwarders-latest
 category: info
 
 ipr: trust200902
 area: General
-workgroup: dprive
+workgroup: add
 keyword: Internet-Draft
 
 stand_alone: yes
@@ -49,13 +49,44 @@ informative:
   MICROSOFT-DOH:
     target: https://docs.microsoft.com/en-us/windows-server/networking/dns/doh-client-support#determine-which-doh-servers-are-on-the-known-server-list
     title: Determine which DoH servers are on the known server list
+  NEXTDNS:
+    target: https://nextdns.io/
+    title: NextDNS
+
+
 
 
 --- abstract
 
-This draft describes how the Discovery of Designated Resolvers (DDR) standard interacts with legacy DNS forwarders, including potential incompatibilities and relevant mitigations.
+This draft describes an extension to the Discovery of Designated Resolvers (DDR) standard, enabling use of encrypted DNS in the presence of legacy DNS forwarders.
 
 --- middle
+
+# Introduction
+
+The Discovery of Designated Resolvers specification {{?DDR=I-D.draft-ietf-add-ddr}} describes a mechanism for clients to learn about the encrypted protocols supported by a DNS server.  It also describes a client validation policy that has strong security properties.
+
+Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR. This is because they are accessed via a private IP address, which TLS certificates cannot normally prove ownership of. Many such devices also face significant hurdles in being upgraded to support encrypted DNS, so it is likely that a large installed base of legacy DNS forwarders, providing Do53 on a private IP address, will remain for some years.
+
+A client in such a network that wants to use the network's DNS resolver is forced to use Do53. It is therefore vulnerable to passive surveillance both on the local network, and between this network and the upstream provider, even if the upstream DNS resolver supports encrypted DNS.
+
+Many of these attacks can be mitigated by using the method described in this document. In a nutshell the process is as follows.
+
+1. The client begins DDR discovery, querying for _dns.resolver.arpa.
+1. The legacy DNS forwarder, since it does not understand DDR, forwards this query upstream.
+1. The upstream recursive resolver, which supports DDR, replies with details of how to access its encrypted DNS service.
+1. The client receives this response and performs Reputation Verified Selection (see {{client-policy}}).
+1. On successful completion, the client may commence using encrypted DNS towards the upstream resolver. This is known as Cross-Forwarder Upgrade.
+
+By this process, Do53 is replaced with encrypted DNS for most queries. The client may wish to continue to send locally-relevant queries (e.g. .local) towards the legacy DNS forwarder.
+
+## Scope
+
+This document describes the interaction between DDR and legacy DNS forwarders.
+
+DNS forwarders and resolvers that are implemented with awareness of DDR are out of scope, as they are not affected by this discussion (although see Security Considerations, {{security-considerations}}).
+
+IPv6-only networks whose default DNS server has a Global Unicast Address are out of scope, even if this server is actually a simple forwarder.  If the DNS server does not use a private IP address, it is not a "legacy DNS forwarder" under this draft's definition.
 
 # Conventions and Definitions
 
@@ -63,125 +94,79 @@ Private IP Address - Any IP address reserved for loopback {{?RFC1122}}, link-loc
 
 Legacy DNS Forwarder - An apparent DNS resolver, known to the client only by a private IP address, that forwards the client's queries to an upstream resolver, and has not been updated with any knowledge of DDR.
 
-Cross-Forwarder Upgrade - Establishment of a direct, encrypted connection between the client and the upstream resolver.
+Cross-Forwarder Upgrade - Establishment and use of a direct, encrypted connection between the client and the upstream resolver.
 
-# Introduction
+# Reputation Verified Selection (RVS) {#client-policy}
 
-## Background
+Reputation Verified Selection (RVS) is a method for validating whether connection using DDR is allowed.  Clients MAY use RVS when (a) the local DNS server is identified by a Private IP address and (b) the DDR SVCB resolution process does not produce any Encrypted DNS endpoints that have this IP address in their A or AAAA records.  RVS then proceeds as follows:
 
-The Discovery of Designated Resolvers specification {{?DDR=I-D.draft-ietf-add-ddr}} describes a mechanism for clients to learn about the encrypted protocols supported by a DNS server.  It also describes a conservative client validation policy that has strong security properties and is unlikely to create compatibility problems.
+1. The client connects to one of the indicated Encrypted DNS endpoints.
+1. The client receives a certificate, which it verifies to a suitable root of trust.
+1. For each identity (e.g. SubjectAltName) in the certificate, the client constructs a Resolver Identity:
+  a. For DNS over TLS and DNS over QUIC, the Resolver Identity is an IP address or hostname and the port number used for the connection.
+  b. For DNS over HTTPS, the Resolver Identity is a URI Template in absolute form, containing the port number used for the connection and path indicated by `dohpath`.
+1. The client determines the reputation of each Resolver Identity derived from the certificate.
+1. The maximum (i.e. most favorable) reputation is the reputation of this connection.
 
-On the topic of client validation of encrypted DNS transports, the DDR specification says:
+> OPEN QUESTION: Would it be better to use the SVCB TargetName to select a single Resolver Identity?  This would avoid the need to enumerate the certificate's names, but it would require the use of SNI (unlike standard DDR), and would not be compatible with all upstream encrypted resolvers.
 
-> If the IP address of a Designated Resolver differs from that of an Unencrypted Resolver, clients MUST validate that the IP address of the Unencrypted Resolver is covered by the SubjectAlternativeName of the Encrypted Resolver's TLS certificate
+> OPEN QUESTION: Can we simplify the resolver identity to just a domain name?  This would make reputation systems easier, but it would not allow distinct reputation for different colocated resolution services, so reputation providers would have to be sure that no approved resolver has other interesting colocated services.
 
-As TLS certificates cannot cover private IP addresses, this prevents clients that are behind a legacy DNS forwarder from connecting directly to the upstream resolver ("cross-forwarder upgrade").
+This process MUST be repeated whenever a new TLS session is established, but reputation scores for each resolver endpoint MAY be cached.
 
-Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR.
+For DNS over HTTPS, the `:authority` pseudo-header MUST reflect the Resolver Identity with the most favorable reputation, to ensure that the HTTP requests are well-formed and are directed to the intended service.  If the Resolver Identity is a wildcard, the reputation system MUST replace it with a valid hostname that matches the wildcard.
 
-## Scope
+Assessing reputation limits the ability of a DDR forgery attack to cause harm, as it will only allow an attacker to direct clients to a resolver they consider trustworthy. Major DoH client implementations already include lists of known or trusted resolvers {{CHROME-DOH}}{{MICROSOFT-DOH}}{{MOZILLA-TRR}}.
 
-This informational document describes the interaction between DDR and legacy DNS forwarders.  It discusses possible client policies, problems that might arise, and relevant mitigations.
+If no resolvers pass the reputation check, the client must not proceed.
 
-DNS forwarders and resolvers that are implemented with awareness of DDR are out of scope, as they are not affected by this discussion (although see Security Considerations, {{security-considerations}}).
+Clients SHOULD start by checking the resolver endpoint with the numerically lowest SVCB SvcPriority.  Clients MAY wait until a DNS query triggers an Encrypted DNS connection attempt before performing this verification.
 
-IPv6-only networks whose default DNS server has a Global Unicast Address are out of scope, even if this server is actually a simple forwarder.  If the DNS server does not use a private IP address, it is not a "legacy DNS forwarder" under this draft's definition.
+If RVS encounters an error or rejects the server, the client MUST fall back to plaintext DNS on port 53.
 
-# Relaxed Validation client policy {#client-policy}
+Successful validation then permits cross-forwarder upgrade.
 
-We define a "relaxed validation" client policy as a client behavior that removes the certificate validation requirement when the Unencrypted Resolver is identified by a private IP address, regardless of the Designated Resolver's IP address.  Instead, under this condition, the client connects using the Opportunistic Privacy Profile of encrypted DNS ({{?RFC7858, Section 4.1}}).
+## Reputation systems {#reputation-systems}
 
-The Opportunistic Privacy Profile is a broad category, including clients that "might or might not validate" the TLS certificate chain even though there is no authentication identity for the server.  This kind of validation can be valuable when combined with a reputation system or a user approval step (see {{reputation}} and {{user-controls}}).
+Embedding a list of known trusted resolvers in a client is only one possible model for assessing the reputation of a resolver. In future a range of online reputation services might be available to be queried, each returning an answer according to their own specific criteria. These might involve answers on other properties such as jurisdiction, or certification by a particular body. It is out of scope for this document to define these query methods, other than to note that designers should be aware of bootstrapping problems. It is the client's decision as to how to combine these answers, possibly using additional metadata (e.g. location), to make a determination of reputation.
 
-This client policy is otherwise identical to the one described in {{Section 4 of DDR}}.
 
-# Naturally compatible behaviors
 
-The following system behaviors are naturally compatible with relaxed validation.
+## Using resolvers of intermediate reputation
 
-## Compatible behaviors in the local network
+If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider.
 
-### Malware and threat domain filtering
+The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.
 
-Certain DNS forwarders block access to domains associated with malware and other threats.  Such threats rely on frequently changing domains, so these forwarders necessarily maintain an actively curated list of domains to block.  To ensure that this service is not lost due to a cross-forwarder upgrade, the maintainers can simply add "resolver.arpa" to the list.
+The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to convey information about why the ADN lacks some element of reputation.
 
-This pattern has been deployed by Mozilla, with the domain "use-application-dns.net" {{MOZILLA-CANARY}}.
+The client can also use the encrypted service for a limited time, as a means of mitigating. By limiting the DDR response TTL to 5 minutes, a client can ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
 
-### Service category restrictions
+# Management of local blocking functionality
 
-Certain DNS forwarders may block access to domains based on the category of service provided by those domains, e.g. domains hosting services that are not appropriate for a work or school environment.  As in the previous section, this requires an actively curated list of domains, because the set of domains that offer a given type of service is constantly changing.  An actively managed blocking list can easily be revised to include "resolver.arpa".
+Certain local DNS forwarders block access to domains associated with malware and other threats. Others block based on the category of service provided by those domains, e.g. domains hosting services that are not appropriate for a work or school environment. In the short term to ensure this service is not lost due to a cross-forwarder upgrade, the maintainers can simply add "resolver.arpa" to their actively curated list of domains to block. This pattern has been deployed by Mozilla, with the domain "use-application-dns.net" {{MOZILLA-CANARY}}.
 
-### Time of use restrictions
+In the long term, it is best for filtering DNS forwarders to implement support for encrypted DNS. The following subsections describe some ways to implement this.
 
-Certain networks may impose restrictions on the time or duration of use by certain users.  This behavior is necessarily implemented below the DNS layer, because DNS-based blocking would be ineffective due to stub resolver caching, so it is not affected by changes in the DNS resolver.
+## Local implementation with DNR
 
-## Upstream resolver services
+The local forwarder can be upgraded to one that implements an encrypted DNS service discoverable through DNR. This requires a TLS certificate on the local device, proving ownership of the chosen Authentication Domain Name (ADN). Onward queries to the internet SHOULD also be protected with encryption.
 
-The forwarder's upstream resolver might provide additional services, such as filtering.  These services are generally independent of cross-forwarder upgrade, and hence naturally compatible.
+## Local implementation with DDR
 
-In special cases where the upstream resolver requires cooperation from a legacy forwarder (e.g. for marking certain queries), one solution is for the upstream resolver to choose not to deploy DDR until all cooperating forwarders have been upgraded.  Alternatively, each legacy forwarder can block "resolver.arpa" as described above.
+If the local forwarder can be upgraded to offer an encrypted DNS service, this can then be made discoverable through classic DDR. If the device has a private IP (as presumed for RVS), a self-signed certificate is sufficient as long as the client supports the Opportunistic Discovery mode of DDR. Onward queries to the internet SHOULD also be protected with encryption.
 
-# Privacy Considerations
+## Move upstream
 
-The conservative validation policy results in no encryption when a legacy DNS forwarder is present.  This leaves the user's query activity vulnerable to passive monitoring {{?RFC7258}}, either on the local network or between the user and the upstream resolver.
+The blocking functionality can be moved to the upstream resolver. Cross-forwarder upgrade then enables the service to continue, as long as the upstream resolver has sufficient reputation.
 
-The relaxed validation policy allows the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.
+# Other issues that can arise from cross-forwarder upgrade
 
-# Security Considerations {#security-considerations}
-
-When the client uses the conservative validation policy described in {{DDR}}, and a DDR-enabled resolver is identified by a private IP address, the client can establish a secure DDR connection only in the absence of an active attacker.  An on-path attacker can impersonate the resolver and intercept all queries, by preventing the DDR upgrade or advertising their own DDR endpoint.
-
-These basic security properties also apply if the client uses the relaxed validation policy described in {{client-policy}}.  Nonetheless, there are some subtle but important differences in the security properties of these two policies.
-
-## Transient attackers
-
-With the conservative validation policy, a transient on-path attacker can only intercept queries for the duration of their active presence on the network, because the client will only send queries to the original (private) server IP address.
-
-With the relaxed validation behavior, a transient on-path attacker could implant a long-lived DDR response in the client's cache, directing its queries to an attacker-controlled server on the public internet.  This would allow the attack to continue long after the attacker has left the network.
-
-Solving or mitigating this attack is of great importance for the user's security.
-
-### Solution: DNR
-
-This attack does not apply if the client and network implement support for Discovery of Network-designated Resolvers, as that mechanism takes precedence over DDR (see {{Section 3.2 of ?DNR=I-D.draft-ietf-add-dnr}}).
-
-### Mitigation: Frequent refresh
-
-The client can choose to refresh the DDR record arbitrarily frequently, e.g. by limiting the TTL.  For example, by limiting the TTL to 5 minutes, a client could ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
-
-### Mitigation: Resolver reputation {#reputation}
-
-A relaxed-validation client might choose to accept a potential cross-forwarder upgrade only if the designated encrypted resolver has sufficient reputation, according to some proprietary reputation scheme (e.g. a locally stored list of respectable resolvers).  This limits the ability of a DDR forgery attack to cause harm.
-
-Major DoH client implementations already include lists of known resolvers {{CHROME-DOH}}{{MICROSOFT-DOH}}{{MOZILLA-TRR}}.
-
-## Forensic logging
-
-### Network-layer logging
-
-With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of an active attack.
-
-With the relaxed validation policy, forensic logs must capture a specific packet (the attacker’s DDR designation response) to enable retrospective detection.
-
-#### Mitigation: Log all DDR responses
-
-Network-layer forensic logs that are not integrated with the resolver can enable detection of these attacks by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.
-
-### DNS-layer logging
-
-DNS-layer forensic logging conducted by a legacy DNS forwarder would be lost in a cross-forwarder upgrade.
-
-#### Solution: Respond for resolver.arpa
-
-Forwarders that want to observe all queries from relaxed validation clients will have to synthesize their own response for resolver.arpa, either implementing DDR or disabling it.
-
-# Compatibility Considerations
-
-Using DDR with legacy DNS forwarders also raises several potential concerns related to loss of existing network services.
+There are a small number of other issues to be aware of. For all these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.
 
 ## Split-horizon namespaces
 
-Some network resolvers contain additional names that are not resolvable in the global DNS.  If these local resolvers are also legacy DNS forwarders, a client that performs a cross-forwarder upgrade might lose access to these local names.
+Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients should be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.
 
 ### Mitigation: NXDOMAIN Fallback
 
@@ -191,7 +176,7 @@ This is similar to the fallback behavior currently deployed in Mozilla Firefox {
 
 NXDOMAIN Fallback results in slight changes to the security and privacy properties of encrypted DNS.  Queries for nonexistent names no longer have protection against a local passive adversary, and local names are revealed to the upstream resolver.
 
-NXDOMAIN Fallback is only applicable when a legacy DNS forwarder might be present, i.e. the unencrypted resolver has a private IP address, and the encrypted resolver has a different IP address.  In the other DDR configurations, any local names are expected to resolve similarly on both resolvers.
+NXDOMAIN Fallback is only applicable when a legacy DNS forwarder might be present, i.e. the unencrypted resolver has a private IP address, and the encrypted resolver has a different IP address.  In other DDR configurations, any local names are expected to resolve similarly on both resolvers.
 
 ## Interposable domains
 
@@ -205,19 +190,65 @@ There are a small number of pre-existing interposable domains, largely of intere
 
 ## Caching
 
-Some legacy DNS forwarders also provide a shared cache for all network users.  Cross-forwarder upgrades will bypass this cache, resulting in slower DNS resolution.
+Many legacy DNS forwarders also provide a shared cache for all network users. Cross-forwarder upgrades will bypass this cache, resulting in slower DNS resolution for some queries.
 
 ### Mitigation: Stub caches
 
 Clients can compensate partially for any loss of shared caching by implementing local DNS caches.  This mitigation is already widely deployed in browsers and operating systems.
 
-## General mitigation: User controls {#user-controls}
+# Privacy Considerations
 
-For these and other compatibility concerns, a possible mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders.  For example, this control could be provided via a general preference, or via a notification upon discovering a new upstream resolver.
+The conservative validation policy results in no encryption when a legacy DNS forwarder is present.  This leaves the user's query activity vulnerable to passive monitoring {{?RFC7258}}, either on the local network or between the user and the upstream resolver.
+
+Reputation Validated Selection enables the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.
+
+# Security Considerations {#security-considerations}
+
+When the client uses the conservative validation policy described in {{DDR}}, the client can establish a secure DDR connection only in the absence of an active attacker.  An on-path attacker can impersonate the resolver and intercept all queries, by preventing the DDR upgrade.
+
+This basic security property also applies if the client uses reputation validated selection, but an additional one is added.
+
+## Redirection
+
+An on-path attacker might be located on the local network, or between the local network and the upstream resolver. In either case, the attacker can redirect the client to a resolver of the attacker's choice, /as long as that resolver meets the client's requirements for reputation/. Hence the reputation system is essential to the security of the user. If a previously-reputable resolver is compromised, users can be redirected to it while this reputation remains high.
+
+### Mitigation: Reputation update
+
+Once an attack has been detected, it should be reported to relevant reputation services so that they can revise their assessment of the ADN.
+
+## Forensic logging
+
+### Network-layer logging
+
+With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of an active attack.
+
+With reputation verified selection, forensic logs must capture a specific packet (the attacker’s DDR designation response) to enable retrospective detection.
+
+#### Mitigation: Log all DDR responses
+
+Network-layer forensic logs that are not integrated with the resolver can enable detection of these attacks by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.
+
+### DNS-layer logging
+
+DNS-layer forensic logging conducted by a legacy DNS forwarder would be lost in a cross-forwarder upgrade.
+
+#### Solution: Plan to upgrade
+
+Forwarders that want to observe all queries from RVS clients should plan to implement DDR or DNR. In the short term it is possible for the forwarder to disable DDR by responding negatively to _dns.resolver.arpa but this is not recommended long-term as it prevents confidentiality protection.
+
+## Per-device observation
+
+With Do53 to a legacy DNS forwarder, an on-path attacker located between the local network and the upstream resolver is not directly aware of how many devices are making DNS queries behind the forwarder. It can only see aggregated queries being made by the forwarder. {{DDR}} to a non-local resolver permits the attacker to become aware of the individual encrypted DNS connections from each device, noting how many there are and the relative number of queries/responses made for each. RVS shares this property.
+
+### Mitigation: Open multiple connections
+
+If the above issue is a concern, clients may wish to open a random number of connections to the designed encrypted resolver and distribute queries among them. This may lead the attacker to assume a larger number of devices than are actually present.
+
 
 --- back
 
 # Acknowledgments
 {:numbered="false"}
 
-Thanks to Anthony Lieuallen and Eric Orth for early reviews.
+Thanks to Anthony Lieuallen and Eric Orth for early reviews of a previous draft.
+
