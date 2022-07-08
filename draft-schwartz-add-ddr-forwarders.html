@@ -4,32 +4,33 @@
 <meta charset="utf-8">
 <meta content="Common,Latin" name="scripts">
 <meta content="initial-scale=1.0" name="viewport">
-<title>Discovery of Designated Resolvers in the Presence of Legacy Forwarders</title>
+<title>Reputation Verified Selection of Upstream Encrypted Resolvers</title>
 <meta content="Benjamin Schwartz" name="author">
 <meta content="Chris Box" name="author">
 <meta content="
-       This draft describes how the Discovery of Designated Resolvers (DDR) standard interacts with legacy DNS forwarders, including potential incompatibilities and relevant mitigations. 
+       This draft describes an extension to the Discovery of Designated Resolvers (DDR) standard, enabling use of encrypted DNS in the presence of legacy DNS forwarders. 
     " name="description">
-<meta content="xml2rfc 3.10.0" name="generator">
+<meta content="xml2rfc 3.13.0" name="generator">
 <meta content="Internet-Draft" name="keyword">
 <meta content="draft-schwartz-add-ddr-forwarders-latest" name="ietf.draft">
 <!-- Generator version information:
-  xml2rfc 3.10.0
-    Python 3.9.5
+  xml2rfc 3.13.0
+    Python 3.10.4
     appdirs 1.4.4
-    ConfigArgParse 1.3
-    google-i18n-address 2.5.0
+    ConfigArgParse 1.5.3
+    google-i18n-address 2.5.2
     html5lib 1.1
     intervaltree 3.1.0
-    Jinja2 2.11.3
+    Jinja2 3.1.2
     kitchen 1.2.6
-    lxml 4.6.3
-    pycountry 20.7.3
-    pyflakes 2.3.0
-    PyYAML 5.4.1
-    requests 2.25.1
-    setuptools 52.0.0
-    six 1.15.0
+    lxml 4.9.1
+    MarkupSafe 2.1.1
+    pycountry 22.3.5
+    pyflakes 2.4.0
+    PyYAML 6.0
+    requests 2.27.1
+    setuptools 59.4.0
+    six 1.16.0
 -->
 <link href="draft-schwartz-add-ddr-forwarders.xml" rel="alternate" type="application/rfc+xml">
 <link href="#copyright" rel="license">
@@ -155,6 +156,14 @@
   src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Lora SemiBold'), local('Lora-SemiBold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-semibold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 @font-face {
   font-family: 'Cabin Condensed';
@@ -198,7 +207,8 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-html {
+:root {
+  color-scheme: light dark;
   --background-color: #fff;
   --text-color: #222;
   --title-color: #191919;
@@ -208,6 +218,7 @@ html {
   --pilcrow-weak: #ddd;
   --pilcrow-strong: #bbb;
   --small-font-size: 14.5px;
+  --font-mono: 'Oxygen Mono', monospace;
   scrollbar-color: #bbb #eee;
 }
 body {
@@ -302,6 +313,10 @@ div {
 svg {
   display: block;
 }
+/* font-family isn't space-separated, but =~ will have to do */
+svg[font-family~="monospace" i], svg [font-family~="monospace" i] {
+  font-family: var(--font-mono);
+}
 .alignCenter.art-text {
   background-color: var(--highlight-color);
   border: 1px solid var(--line-color);
@@ -330,7 +345,7 @@ ol, ul {
   padding: 0;
   margin: 0 0 0.5em 2em;
 }
-ol ol, ul ul, ol ul, ul ol {
+:is(ol, ul) :is(ol, ul) {
   margin-left: 1em;
 }
 li {
@@ -345,8 +360,7 @@ ul.empty, .ulEmpty {
 ul.empty li, .ulEmpty li {
   margin-top: 0.5em;
 }
-ul.compact, .ulCompact,
-ol.compact, .olCompact {
+:is(ul, ol).compact, .ulCompact, .olCompact {
   line-height: 100%;
   margin: 0 0 0 2em;
 }
@@ -362,7 +376,7 @@ dl > dd {
   margin-bottom: .8em;
   min-height: 1.3em;
 }
-dl.compact > dd, .dlCompact > dd {
+:is(dl.compact, .dlCompact) > dd {
   margin-bottom: 0em;
 }
 dl > dd > dl {
@@ -396,13 +410,16 @@ a.xref {
 /* Figures */
 tt, code, pre {
   background-color: var(--highlight-color);
-  font: 14px/22px 'Oxygen Mono', monospace;
+  font: 14px/22px var(--font-mono);
 }
 tt, code {
   /* changing the font for inline elements leads to different ascender
      and descender heights; as we want to retain baseline alignment,
      remove leading to avoid altering the final height of lines */
   line-height: 0;
+}
+:is(h1, h2, h3, h4, h5, h6) :is(tt, code) {
+  font-size: 84%;
 }
 pre {
   border: 1px solid var(--line-color);
@@ -428,6 +445,19 @@ figcaption, caption {
   text-align: left;
 }
 @media screen {
+  /* Auto-collapse boilerplate. */
+  :is(#status-of-memo, #copyright) p {
+    margin: -2px 0;
+    max-height: 0;
+    transition: max-height 2s ease, margin 0.5s ease 0.5s;
+    overflow: hidden;
+  }
+  :is(#status-of-memo, #copyright):hover p,
+  :is(#status-of-memo, #copyright) h2:target ~ p {
+    margin: 0.5em 0;
+    max-height: 500px;
+    overflow: auto;
+  }
   pre, svg {
     display: inline-block;
     overflow-x: auto;
@@ -443,7 +473,7 @@ figcaption, caption {
     display: block;
     width: calc(100% - 25px);
   }
-  pre + .pilcrow, svg + .pilcrow {
+  :is(pre, svg) + .pilcrow {
     display: inline-block;
     vertical-align: text-bottom;
     padding-bottom: 8px;
@@ -492,17 +522,11 @@ th, td {
 th {
   background-color: var(--line-color);
 }
-tr:nth-child(2n) > td {
+:is(tr:nth-child(2n), thead+tbody > tr:nth-child(2n+1)) > td {
   background-color: var(--background-color);
 }
-tr:nth-child(2n+1) > td {
+:is(tr:nth-child(2n+1), thead+tbody > tr:nth-child(2n)) > td {
   background-color: var(--highlight-color);
-}
-thead+tbody > tr:nth-child(2n) > td {
-  background-color: var(--highlight-color);
-}
-thead+tbody > tr:nth-child(2n+1) > td {
-  background-color: var(--background-color);
 }
 table caption {
   margin: 0;
@@ -542,8 +566,9 @@ hr {
 }
 .bcp14 {
   font-variant: small-caps;
+  font-weight: 600;
+  font-size: 14.5px;
 }
-
 .role {
   font-variant: all-small-caps;
 }
@@ -627,36 +652,8 @@ hr {
 }
 
 /* index */
-.index ul {
-  margin: 0 0 0 1em;
-  padding: 0;
-  list-style: none;
-}
-.index ul ul {
-  margin: 0;
-}
-.index li {
-  margin: 0;
-  text-indent: -2em;
-  padding-left: 2em;
-  padding-bottom: 5px;
-}
-.indexIndex {
-  margin: 0.5em 0 1em;
-}
-.index a {
-  font-weight: 700;
-}
-/* make the index two-column on all but the smallest screens */
-@media (min-width: 500px) {
-  .index ul {
-    column-count: 2;
-    column-gap: 20px;
-  }
-  .index ul ul {
-    column-count: 1;
-    column-gap: 0;
-  }
+#rfc\.index\.index + ul {
+  margin-left: 0;
 }
 
 /* authors */
@@ -810,7 +807,7 @@ hr.addr {
     margin: 0 0 0 4px;
     font-size: var(--small-font-size);
   }
-  #toc ul p, #toc ul li {
+  #toc ul :is(p, li) {
     margin: 2px 0;
     line-height: 22px;
   }
@@ -920,13 +917,13 @@ dl.dlNewline > dt {
 }
 
 /* Provide styling for table cell text alignment */
-table .text-left, table .text-left {
+table .text-left {
   text-align: left;
 }
-table .text-center, table .text-center {
+table .text-center {
   text-align: center;
 }
-table .text-right, table .text-right {
+table .text-right {
   text-align: right;
 }
 
@@ -993,16 +990,10 @@ address div.right {
   }
 
 }
-/* Tweak the bcp14 keyword presentation */
-.bcp14 {
-  font-variant: small-caps;
-  font-weight: bold;
-  font-size: 0.9em;
-}
 
 /* Dark mode. */
 @media (prefers-color-scheme: dark) {
-html {
+:root {
   --background-color: #121212;
   --text-color: #f0f0f0;
   --title-color: #fff;
@@ -1013,19 +1004,20 @@ html {
   --pilcrow-strong: #666;
   scrollbar-color: #777 #333;
 }
-/* Trick: a prefix match works because only black and white are allowed */
-svg [stroke="black"], svg [stroke^="#000"] {
+}
+
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg :is([stroke="black"], [stroke^="#000"]) {
   stroke: var(--text-color);
 }
-svg [stroke="white"], svg [stroke^="#fff"] {
+svg :is([stroke="white"], [stroke^="#fff"]) {
   stroke: var(--background-color);
 }
-svg [fill="black"], svg [fill^="#000"], svg :not([fill]) {
+svg :is([fill="black"], [fill^="#000"], :not([fill])) {
   fill: var(--text-color);
 }
-svg [stroke="fill"], svg [fill^="#fff"] {
+svg :is([stroke="fill"], [fill^="#fff"]) {
   fill: var(--background-color);
-}
 }
 </style>
 
@@ -1035,11 +1027,11 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 <thead><tr>
 <td class="left">Internet-Draft</td>
 <td class="center">DDR and Forwarders</td>
-<td class="right">October 2021</td>
+<td class="right">July 2022</td>
 </tr></thead>
 <tfoot><tr>
 <td class="left">Schwartz &amp; Box</td>
-<td class="center">Expires 25 April 2022</td>
+<td class="center">Expires 9 January 2023</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1047,17 +1039,17 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 <div id="internal-metadata" class="document-information">
 <dl id="identifiers">
 <dt class="label-workgroup">Workgroup:</dt>
-<dd class="workgroup">dprive</dd>
+<dd class="workgroup">add</dd>
 <dt class="label-internet-draft">Internet-Draft:</dt>
 <dd class="internet-draft">draft-schwartz-add-ddr-forwarders-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2021-10-22" class="published">22 October 2021</time>
+<time datetime="2022-07-08" class="published">8 July 2022</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2022-04-25">25 April 2022</time></dd>
+<dd class="expires"><time datetime="2023-01-09">9 January 2023</time></dd>
 <dt class="label-authors">Authors:</dt>
 <dd class="authors">
 <div class="author">
@@ -1071,10 +1063,10 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 </dd>
 </dl>
 </div>
-<h1 id="title">Discovery of Designated Resolvers in the Presence of Legacy Forwarders</h1>
+<h1 id="title">Reputation Verified Selection of Upstream Encrypted Resolvers</h1>
 <section id="section-abstract">
       <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
-<p id="section-abstract-1">This draft describes how the Discovery of Designated Resolvers (DDR) standard interacts with legacy DNS forwarders, including potential incompatibilities and relevant mitigations.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+<p id="section-abstract-1">This draft describes an extension to the Discovery of Designated Resolvers (DDR) standard, enabling use of encrypted DNS in the presence of legacy DNS forwarders.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-discussion-venues">
@@ -1106,7 +1098,7 @@ svg [stroke="fill"], svg [fill^="#fff"] {
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 25 April 2022.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 9 January 2023.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1115,7 +1107,7 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 <a href="#name-copyright-notice" class="section-name selfRef">Copyright Notice</a>
         </h2>
 <p id="section-boilerplate.2-1">
-            Copyright (c) 2021 IETF Trust and the persons identified as the
+            Copyright (c) 2022 IETF Trust and the persons identified as the
             document authors. All rights reserved.<a href="#section-boilerplate.2-1" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.2-2">
             This document is subject to BCP 78 and the IETF Trust's Legal
@@ -1124,9 +1116,9 @@ svg [stroke="fill"], svg [fill^="#fff"] {
             publication of this document. Please review these documents
             carefully, as they describe your rights and restrictions with
             respect to this document. Code Components extracted from this
-            document must include Simplified BSD License text as described in
+            document must include Revised BSD License text as described in
             Section 4.e of the Trust Legal Provisions and are provided without
-            warranty as described in the Simplified BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
+            warranty as described in the Revised BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="toc">
@@ -1136,106 +1128,102 @@ svg [stroke="fill"], svg [fill^="#fff"] {
         </h2>
 <nav class="toc"><ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
-            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="xref">1</a>.  <a href="#name-conventions-and-definitions" class="xref">Conventions and Definitions</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
-            <p id="section-toc.1-1.2.1"><a href="#section-2" class="xref">2</a>.  <a href="#name-introduction" class="xref">Introduction</a></p>
+            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="xref">1</a>.  <a href="#name-introduction" class="xref">Introduction</a></p>
 <ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2.2.1">
-                <p id="section-toc.1-1.2.2.1.1" class="keepWithNext"><a href="#section-2.1" class="xref">2.1</a>.  <a href="#name-background" class="xref">Background</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2.2.2">
-                <p id="section-toc.1-1.2.2.2.1" class="keepWithNext"><a href="#section-2.2" class="xref">2.2</a>.  <a href="#name-scope" class="xref">Scope</a></p>
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.1">
+                <p id="section-toc.1-1.1.2.1.1" class="keepWithNext"><a href="#section-1.1" class="xref">1.1</a>.  <a href="#name-scope" class="xref">Scope</a></p>
 </li>
             </ul>
 </li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="xref">2</a>.  <a href="#name-conventions-and-definitions" class="xref">Conventions and Definitions</a></p>
+</li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
-            <p id="section-toc.1-1.3.1"><a href="#section-3" class="xref">3</a>.  <a href="#name-relaxed-validation-client-p" class="xref">Relaxed Validation client policy</a></p>
+            <p id="section-toc.1-1.3.1"><a href="#section-3" class="xref">3</a>.  <a href="#name-reputation-verified-selecti" class="xref">Reputation Verified Selection (RVS)</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.1">
+                <p id="section-toc.1-1.3.2.1.1"><a href="#section-3.1" class="xref">3.1</a>.  <a href="#name-reputation-systems" class="xref">Reputation systems</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.2">
+                <p id="section-toc.1-1.3.2.2.1"><a href="#section-3.2" class="xref">3.2</a>.  <a href="#name-using-resolvers-of-intermed" class="xref">Using resolvers of intermediate reputation</a></p>
+</li>
+            </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
-            <p id="section-toc.1-1.4.1"><a href="#section-4" class="xref">4</a>.  <a href="#name-naturally-compatible-behavi" class="xref">Naturally compatible behaviors</a></p>
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="xref">4</a>.  <a href="#name-management-of-local-blockin" class="xref">Management of local blocking functionality</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1">
-                <p id="section-toc.1-1.4.2.1.1"><a href="#section-4.1" class="xref">4.1</a>.  <a href="#name-compatible-behaviors-in-the" class="xref">Compatible behaviors in the local network</a></p>
-<ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1.2.1">
-                    <p id="section-toc.1-1.4.2.1.2.1.1"><a href="#section-4.1.1" class="xref">4.1.1</a>.  <a href="#name-malware-and-threat-domain-f" class="xref">Malware and threat domain filtering</a></p>
-</li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1.2.2">
-                    <p id="section-toc.1-1.4.2.1.2.2.1"><a href="#section-4.1.2" class="xref">4.1.2</a>.  <a href="#name-service-category-restrictio" class="xref">Service category restrictions</a></p>
-</li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1.2.3">
-                    <p id="section-toc.1-1.4.2.1.2.3.1"><a href="#section-4.1.3" class="xref">4.1.3</a>.  <a href="#name-time-of-use-restrictions" class="xref">Time of use restrictions</a></p>
-</li>
-                </ul>
+                <p id="section-toc.1-1.4.2.1.1"><a href="#section-4.1" class="xref">4.1</a>.  <a href="#name-local-implementation-with-d" class="xref">Local implementation with DNR</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.2">
-                <p id="section-toc.1-1.4.2.2.1"><a href="#section-4.2" class="xref">4.2</a>.  <a href="#name-upstream-resolver-services" class="xref">Upstream resolver services</a></p>
+                <p id="section-toc.1-1.4.2.2.1"><a href="#section-4.2" class="xref">4.2</a>.  <a href="#name-local-implementation-with-dd" class="xref">Local implementation with DDR</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.3">
+                <p id="section-toc.1-1.4.2.3.1"><a href="#section-4.3" class="xref">4.3</a>.  <a href="#name-move-upstream" class="xref">Move upstream</a></p>
 </li>
             </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
-            <p id="section-toc.1-1.5.1"><a href="#section-5" class="xref">5</a>.  <a href="#name-privacy-considerations" class="xref">Privacy Considerations</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
-            <p id="section-toc.1-1.6.1"><a href="#section-6" class="xref">6</a>.  <a href="#name-security-considerations" class="xref">Security Considerations</a></p>
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="xref">5</a>.  <a href="#name-other-issues-that-can-arise" class="xref">Other issues that can arise from cross-forwarder upgrade</a></p>
 <ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1">
-                <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="xref">6.1</a>.  <a href="#name-transient-attackers" class="xref">Transient attackers</a></p>
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.1">
+                <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="xref">5.1</a>.  <a href="#name-split-horizon-namespaces" class="xref">Split-horizon namespaces</a></p>
 <ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1.2.1">
-                    <p id="section-toc.1-1.6.2.1.2.1.1"><a href="#section-6.1.1" class="xref">6.1.1</a>.  <a href="#name-solution-dnr" class="xref">Solution: DNR</a></p>
-</li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1.2.2">
-                    <p id="section-toc.1-1.6.2.1.2.2.1"><a href="#section-6.1.2" class="xref">6.1.2</a>.  <a href="#name-mitigation-frequent-refresh" class="xref">Mitigation: Frequent refresh</a></p>
-</li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1.2.3">
-                    <p id="section-toc.1-1.6.2.1.2.3.1"><a href="#section-6.1.3" class="xref">6.1.3</a>.  <a href="#name-mitigation-resolver-reputat" class="xref">Mitigation: Resolver reputation</a></p>
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.1.2.1">
+                    <p id="section-toc.1-1.5.2.1.2.1.1"><a href="#section-5.1.1" class="xref">5.1.1</a>.  <a href="#name-mitigation-nxdomain-fallbac" class="xref">Mitigation: NXDOMAIN Fallback</a></p>
 </li>
                 </ul>
 </li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2">
-                <p id="section-toc.1-1.6.2.2.1"><a href="#section-6.2" class="xref">6.2</a>.  <a href="#name-forensic-logging" class="xref">Forensic logging</a></p>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.2">
+                <p id="section-toc.1-1.5.2.2.1"><a href="#section-5.2" class="xref">5.2</a>.  <a href="#name-interposable-domains" class="xref">Interposable domains</a></p>
 <ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2.2.1">
-                    <p id="section-toc.1-1.6.2.2.2.1.1"><a href="#section-6.2.1" class="xref">6.2.1</a>.  <a href="#name-network-layer-logging" class="xref">Network-layer logging</a></p>
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.2.2.1">
+                    <p id="section-toc.1-1.5.2.2.2.1.1"><a href="#section-5.2.1" class="xref">5.2.1</a>.  <a href="#name-mitigation-exemption-list" class="xref">Mitigation: Exemption list</a></p>
 </li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2.2.2">
-                    <p id="section-toc.1-1.6.2.2.2.2.1"><a href="#section-6.2.2" class="xref">6.2.2</a>.  <a href="#name-dns-layer-logging" class="xref">DNS-layer logging</a></p>
+                </ul>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.3">
+                <p id="section-toc.1-1.5.2.3.1"><a href="#section-5.3" class="xref">5.3</a>.  <a href="#name-caching" class="xref">Caching</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.3.2.1">
+                    <p id="section-toc.1-1.5.2.3.2.1.1"><a href="#section-5.3.1" class="xref">5.3.1</a>.  <a href="#name-mitigation-stub-caches" class="xref">Mitigation: Stub caches</a></p>
 </li>
                 </ul>
 </li>
             </ul>
 </li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="xref">6</a>.  <a href="#name-privacy-considerations" class="xref">Privacy Considerations</a></p>
+</li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
-            <p id="section-toc.1-1.7.1"><a href="#section-7" class="xref">7</a>.  <a href="#name-compatibility-consideration" class="xref">Compatibility Considerations</a></p>
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="xref">7</a>.  <a href="#name-security-considerations" class="xref">Security Considerations</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.1">
-                <p id="section-toc.1-1.7.2.1.1"><a href="#section-7.1" class="xref">7.1</a>.  <a href="#name-split-horizon-namespaces" class="xref">Split-horizon namespaces</a></p>
+                <p id="section-toc.1-1.7.2.1.1"><a href="#section-7.1" class="xref">7.1</a>.  <a href="#name-redirection" class="xref">Redirection</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.1.2.1">
-                    <p id="section-toc.1-1.7.2.1.2.1.1"><a href="#section-7.1.1" class="xref">7.1.1</a>.  <a href="#name-mitigation-nxdomain-fallbac" class="xref">Mitigation: NXDOMAIN Fallback</a></p>
+                    <p id="section-toc.1-1.7.2.1.2.1.1"><a href="#section-7.1.1" class="xref">7.1.1</a>.  <a href="#name-mitigation-reputation-updat" class="xref">Mitigation: Reputation update</a></p>
 </li>
                 </ul>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.2">
-                <p id="section-toc.1-1.7.2.2.1"><a href="#section-7.2" class="xref">7.2</a>.  <a href="#name-interposable-domains" class="xref">Interposable domains</a></p>
+                <p id="section-toc.1-1.7.2.2.1"><a href="#section-7.2" class="xref">7.2</a>.  <a href="#name-forensic-logging" class="xref">Forensic logging</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.2.2.1">
-                    <p id="section-toc.1-1.7.2.2.2.1.1"><a href="#section-7.2.1" class="xref">7.2.1</a>.  <a href="#name-mitigation-exemption-list" class="xref">Mitigation: Exemption list</a></p>
+                    <p id="section-toc.1-1.7.2.2.2.1.1"><a href="#section-7.2.1" class="xref">7.2.1</a>.  <a href="#name-network-layer-logging" class="xref">Network-layer logging</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.2.2.2">
+                    <p id="section-toc.1-1.7.2.2.2.2.1"><a href="#section-7.2.2" class="xref">7.2.2</a>.  <a href="#name-dns-layer-logging" class="xref">DNS-layer logging</a></p>
 </li>
                 </ul>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.3">
-                <p id="section-toc.1-1.7.2.3.1"><a href="#section-7.3" class="xref">7.3</a>.  <a href="#name-caching" class="xref">Caching</a></p>
+                <p id="section-toc.1-1.7.2.3.1"><a href="#section-7.3" class="xref">7.3</a>.  <a href="#name-per-device-observation" class="xref">Per-device observation</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.3.2.1">
-                    <p id="section-toc.1-1.7.2.3.2.1.1"><a href="#section-7.3.1" class="xref">7.3.1</a>.  <a href="#name-mitigation-stub-caches" class="xref">Mitigation: Stub caches</a></p>
+                    <p id="section-toc.1-1.7.2.3.2.1.1"><a href="#section-7.3.1" class="xref">7.3.1</a>.  <a href="#name-mitigation-open-multiple-co" class="xref">Mitigation: Open multiple connections</a></p>
 </li>
                 </ul>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4">
-                <p id="section-toc.1-1.7.2.4.1"><a href="#section-7.4" class="xref">7.4</a>.  <a href="#name-general-mitigation-user-con" class="xref">General mitigation: User controls</a></p>
 </li>
             </ul>
 </li>
@@ -1252,265 +1240,287 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 </nav>
 </section>
 </div>
-<div id="conventions-and-definitions">
-<section id="section-1">
-      <h2 id="name-conventions-and-definitions">
-<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-conventions-and-definitions" class="section-name selfRef">Conventions and Definitions</a>
-      </h2>
-<p id="section-1-1">Private IP Address - Any IP address reserved for loopback <span>[<a href="#RFC1122" class="xref">RFC1122</a>]</span>, link-local <span>[<a href="#RFC3927" class="xref">RFC3927</a>]</span>, private <span>[<a href="#RFC1918" class="xref">RFC1918</a>]</span>, local <span>[<a href="#RFC4193" class="xref">RFC4193</a>]</span>, or Carrier-Grade NAT <span>[<a href="#RFC6598" class="xref">RFC6598</a>]</span> use.<a href="#section-1-1" class="pilcrow">¶</a></p>
-<p id="section-1-2">Legacy DNS Forwarder - An apparent DNS resolver, known to the client only by a private IP address, that forwards the client's queries to an upstream resolver, and has not been updated with any knowledge of DDR.<a href="#section-1-2" class="pilcrow">¶</a></p>
-<p id="section-1-3">Cross-Forwarder Upgrade - Establishment of a direct, encrypted connection between the client and the upstream resolver.<a href="#section-1-3" class="pilcrow">¶</a></p>
-</section>
-</div>
 <div id="introduction">
-<section id="section-2">
+<section id="section-1">
       <h2 id="name-introduction">
-<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
+<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
       </h2>
-<div id="background">
-<section id="section-2.1">
-        <h3 id="name-background">
-<a href="#section-2.1" class="section-number selfRef">2.1. </a><a href="#name-background" class="section-name selfRef">Background</a>
-        </h3>
-<p id="section-2.1-1">The Discovery of Designated Resolvers specification <span>[<a href="#DDR" class="xref">DDR</a>]</span> describes a mechanism for clients to learn about the encrypted protocols supported by a DNS server.  It also describes a conservative client validation policy that has strong security properties and is unlikely to create compatibility problems.<a href="#section-2.1-1" class="pilcrow">¶</a></p>
-<p id="section-2.1-2">On the topic of client validation of encrypted DNS transports, the DDR specification says:<a href="#section-2.1-2" class="pilcrow">¶</a></p>
-<ul class="normal ulEmpty">
-<li class="normal ulEmpty" id="section-2.1-3.1">
-            <p id="section-2.1-3.1.1">If the IP address of a Designated Resolver differs from that of an Unencrypted Resolver, clients MUST validate that the IP address of the Unencrypted Resolver is covered by the SubjectAlternativeName of the Encrypted Resolver's TLS certificate<a href="#section-2.1-3.1.1" class="pilcrow">¶</a></p>
+<p id="section-1-1">The Discovery of Designated Resolvers specification <span>[<a href="#DDR" class="xref">DDR</a>]</span> describes a mechanism for clients to learn about the encrypted protocols supported by a DNS server.  It also describes a client validation policy that has strong security properties.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2">Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR. This is because they are accessed via a private IP address, which TLS certificates cannot normally prove ownership of. Many such devices also face significant hurdles in being upgraded to support encrypted DNS, so it is likely that a large installed base of legacy DNS forwarders, providing Do53 on a private IP address, will remain for some years.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">A client in such a network that wants to use the network's DNS resolver is forced to use Do53. It is therefore vulnerable to passive surveillance both on the local network, and between this network and the upstream provider, even if the upstream DNS resolver supports encrypted DNS.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">Many of these attacks can be mitigated by using the method described in this document. In a nutshell the process is as follows.<a href="#section-1-4" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-1-5">
+<li id="section-1-5.1">The client begins DDR discovery, querying for _dns.resolver.arpa.<a href="#section-1-5.1" class="pilcrow">¶</a>
 </li>
-        </ul>
-<p id="section-2.1-4">As TLS certificates cannot cover private IP addresses, this prevents clients that are behind a legacy DNS forwarder from connecting directly to the upstream resolver ("cross-forwarder upgrade").<a href="#section-2.1-4" class="pilcrow">¶</a></p>
-<p id="section-2.1-5">Recent estimates suggest that a large fraction, perhaps a majority, of residential internet users in the United States and Europe rely on local DNS forwarders that are not compatible with DDR.<a href="#section-2.1-5" class="pilcrow">¶</a></p>
-</section>
-</div>
+        <li id="section-1-5.2">The legacy DNS forwarder, since it does not understand DDR, forwards this query upstream.<a href="#section-1-5.2" class="pilcrow">¶</a>
+</li>
+        <li id="section-1-5.3">The upstream recursive resolver, which supports DDR, replies with details of how to access its encrypted DNS service.<a href="#section-1-5.3" class="pilcrow">¶</a>
+</li>
+        <li id="section-1-5.4">The client receives this response and performs Reputation Verified Selection (see <a href="#client-policy" class="xref">Section 3</a>).<a href="#section-1-5.4" class="pilcrow">¶</a>
+</li>
+        <li id="section-1-5.5">On successful completion, the client may commence using encrypted DNS towards the upstream resolver. This is known as Cross-Forwarder Upgrade.<a href="#section-1-5.5" class="pilcrow">¶</a>
+</li>
+      </ol>
+<p id="section-1-6">By this process, Do53 is replaced with encrypted DNS for most queries. The client may wish to continue to send locally-relevant queries (e.g. .local) towards the legacy DNS forwarder.<a href="#section-1-6" class="pilcrow">¶</a></p>
 <div id="scope">
-<section id="section-2.2">
+<section id="section-1.1">
         <h3 id="name-scope">
-<a href="#section-2.2" class="section-number selfRef">2.2. </a><a href="#name-scope" class="section-name selfRef">Scope</a>
+<a href="#section-1.1" class="section-number selfRef">1.1. </a><a href="#name-scope" class="section-name selfRef">Scope</a>
         </h3>
-<p id="section-2.2-1">This informational document describes the interaction between DDR and legacy DNS forwarders.  It discusses possible client policies, problems that might arise, and relevant mitigations.<a href="#section-2.2-1" class="pilcrow">¶</a></p>
-<p id="section-2.2-2">DNS forwarders and resolvers that are implemented with awareness of DDR are out of scope, as they are not affected by this discussion (although see Security Considerations, <a href="#security-considerations" class="xref">Section 6</a>).<a href="#section-2.2-2" class="pilcrow">¶</a></p>
-<p id="section-2.2-3">IPv6-only networks whose default DNS server has a Global Unicast Address are out of scope, even if this server is actually a simple forwarder.  If the DNS server does not use a private IP address, it is not a "legacy DNS forwarder" under this draft's definition.<a href="#section-2.2-3" class="pilcrow">¶</a></p>
+<p id="section-1.1-1">This document describes the interaction between DDR and legacy DNS forwarders.<a href="#section-1.1-1" class="pilcrow">¶</a></p>
+<p id="section-1.1-2">DNS forwarders and resolvers that are implemented with awareness of DDR are out of scope, as they are not affected by this discussion (although see Security Considerations, <a href="#security-considerations" class="xref">Section 7</a>).<a href="#section-1.1-2" class="pilcrow">¶</a></p>
+<p id="section-1.1-3">IPv6-only networks whose default DNS server has a Global Unicast Address are out of scope, even if this server is actually a simple forwarder.  If the DNS server does not use a private IP address, it is not a "legacy DNS forwarder" under this draft's definition.<a href="#section-1.1-3" class="pilcrow">¶</a></p>
 </section>
 </div>
+</section>
+</div>
+<div id="conventions-and-definitions">
+<section id="section-2">
+      <h2 id="name-conventions-and-definitions">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-conventions-and-definitions" class="section-name selfRef">Conventions and Definitions</a>
+      </h2>
+<p id="section-2-1">Private IP Address - Any IP address reserved for loopback <span>[<a href="#RFC1122" class="xref">RFC1122</a>]</span>, link-local <span>[<a href="#RFC3927" class="xref">RFC3927</a>]</span>, private <span>[<a href="#RFC1918" class="xref">RFC1918</a>]</span>, local <span>[<a href="#RFC4193" class="xref">RFC4193</a>]</span>, or Carrier-Grade NAT <span>[<a href="#RFC6598" class="xref">RFC6598</a>]</span> use.<a href="#section-2-1" class="pilcrow">¶</a></p>
+<p id="section-2-2">Legacy DNS Forwarder - An apparent DNS resolver, known to the client only by a private IP address, that forwards the client's queries to an upstream resolver, and has not been updated with any knowledge of DDR.<a href="#section-2-2" class="pilcrow">¶</a></p>
+<p id="section-2-3">Cross-Forwarder Upgrade - Establishment and use of a direct, encrypted connection between the client and the upstream resolver.<a href="#section-2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="client-policy">
 <section id="section-3">
-      <h2 id="name-relaxed-validation-client-p">
-<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-relaxed-validation-client-p" class="section-name selfRef">Relaxed Validation client policy</a>
+      <h2 id="name-reputation-verified-selecti">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-reputation-verified-selecti" class="section-name selfRef">Reputation Verified Selection (RVS)</a>
       </h2>
-<p id="section-3-1">We define a "relaxed validation" client policy as a client behavior that removes the certificate validation requirement when the Unencrypted Resolver is identified by a private IP address, regardless of the Designated Resolver's IP address.  Instead, under this condition, the client connects using the Opportunistic Privacy Profile of encrypted DNS (<span>[<a href="#RFC7858" class="xref">RFC7858</a>], <a href="https://rfc-editor.org/rfc/rfc7858#section-4.1" class="relref">Section 4.1</a></span>).<a href="#section-3-1" class="pilcrow">¶</a></p>
-<p id="section-3-2">The Opportunistic Privacy Profile is a broad category, including clients that "might or might not validate" the TLS certificate chain even though there is no authentication identity for the server.  This kind of validation can be valuable when combined with a reputation system or a user approval step (see <a href="#reputation" class="xref">Section 6.1.3</a> and <a href="#user-controls" class="xref">Section 7.4</a>).<a href="#section-3-2" class="pilcrow">¶</a></p>
-<p id="section-3-3">This client policy is otherwise identical to the one described in <span><a href="https://datatracker.ietf.org/doc/html/draft-ietf-add-ddr-03#section-4" class="relref">Section 4</a> of [<a href="#DDR" class="xref">DDR</a>]</span>.<a href="#section-3-3" class="pilcrow">¶</a></p>
+<p id="section-3-1">Reputation Verified Selection (RVS) is a method for validating whether connection using DDR is allowed.  Clients MAY use RVS when (a) the local DNS server is identified by a Private IP address and (b) the DDR SVCB resolution process does not produce any Encrypted DNS endpoints that have this IP address in their A or AAAA records.  RVS then proceeds as follows:<a href="#section-3-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-3-2">
+<li id="section-3-2.1">The client connects to one of the indicated Encrypted DNS endpoints.<a href="#section-3-2.1" class="pilcrow">¶</a>
+</li>
+        <li id="section-3-2.2">The client receives a certificate, which it verifies to a suitable root of trust.<a href="#section-3-2.2" class="pilcrow">¶</a>
+</li>
+        <li id="section-3-2.3">For each identity (e.g. SubjectAltName) in the certificate, the client constructs a Resolver Identity:
+  a. For DNS over TLS and DNS over QUIC, the Resolver Identity is an IP address or hostname and the port number used for the connection.
+  b. For DNS over HTTPS, the Resolver Identity is a URI Template in absolute form, containing the port number used for the connection and path indicated by <code>dohpath</code>.<a href="#section-3-2.3" class="pilcrow">¶</a>
+</li>
+        <li id="section-3-2.4">The client determines the reputation of each Resolver Identity derived from the certificate.<a href="#section-3-2.4" class="pilcrow">¶</a>
+</li>
+        <li id="section-3-2.5">The maximum (i.e. most favorable) reputation is the reputation of this connection.<a href="#section-3-2.5" class="pilcrow">¶</a>
+</li>
+      </ol>
+<ul class="normal ulEmpty">
+<li class="normal ulEmpty" id="section-3-3.1">
+          <p id="section-3-3.1.1">OPEN QUESTION: Would it be better to use the SVCB TargetName to select a single Resolver Identity?  This would avoid the need to enumerate the certificate's names, but it would require the use of SNI (unlike standard DDR), and would not be compatible with all upstream encrypted resolvers.<a href="#section-3-3.1.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<ul class="normal ulEmpty">
+<li class="normal ulEmpty" id="section-3-4.1">
+          <p id="section-3-4.1.1">OPEN QUESTION: Can we simplify the resolver identity to just a domain name?  This would make reputation systems easier, but it would not allow distinct reputation for different colocated resolution services, so reputation providers would have to be sure that no approved resolver has other interesting colocated services.<a href="#section-3-4.1.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-3-5">This process MUST be repeated whenever a new TLS session is established, but reputation scores for each resolver endpoint MAY be cached.<a href="#section-3-5" class="pilcrow">¶</a></p>
+<p id="section-3-6">For DNS over HTTPS, the <code>:authority</code> pseudo-header MUST reflect the Resolver Identity with the most favorable reputation, to ensure that the HTTP requests are well-formed and are directed to the intended service.  If the Resolver Identity is a wildcard, the reputation system MUST replace it with a valid hostname that matches the wildcard.<a href="#section-3-6" class="pilcrow">¶</a></p>
+<p id="section-3-7">Assessing reputation limits the ability of a DDR forgery attack to cause harm, as it will only allow an attacker to direct clients to a resolver they consider trustworthy. Major DoH client implementations already include lists of known or trusted resolvers <span>[<a href="#CHROME-DOH" class="xref">CHROME-DOH</a>]</span><span>[<a href="#MICROSOFT-DOH" class="xref">MICROSOFT-DOH</a>]</span><span>[<a href="#MOZILLA-TRR" class="xref">MOZILLA-TRR</a>]</span>.<a href="#section-3-7" class="pilcrow">¶</a></p>
+<p id="section-3-8">If no resolvers pass the reputation check, the client must not proceed.<a href="#section-3-8" class="pilcrow">¶</a></p>
+<p id="section-3-9">Clients SHOULD start by checking the resolver endpoint with the numerically lowest SVCB SvcPriority.  Clients MAY wait until a DNS query triggers an Encrypted DNS connection attempt before performing this verification.<a href="#section-3-9" class="pilcrow">¶</a></p>
+<p id="section-3-10">If RVS encounters an error or rejects the server, the client MUST fall back to plaintext DNS on port 53.<a href="#section-3-10" class="pilcrow">¶</a></p>
+<p id="section-3-11">Successful validation then permits cross-forwarder upgrade.<a href="#section-3-11" class="pilcrow">¶</a></p>
+<div id="reputation-systems">
+<section id="section-3.1">
+        <h3 id="name-reputation-systems">
+<a href="#section-3.1" class="section-number selfRef">3.1. </a><a href="#name-reputation-systems" class="section-name selfRef">Reputation systems</a>
+        </h3>
+<p id="section-3.1-1">Embedding a list of known trusted resolvers in a client is only one possible model for assessing the reputation of a resolver. In future a range of online reputation services might be available to be queried, each returning an answer according to their own specific criteria. These might involve answers on other properties such as jurisdiction, or certification by a particular body. It is out of scope for this document to define these query methods, other than to note that designers should be aware of bootstrapping problems. It is the client's decision as to how to combine these answers, possibly using additional metadata (e.g. location), to make a determination of reputation.<a href="#section-3.1-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="naturally-compatible-behaviors">
+<div id="using-resolvers-of-intermediate-reputation">
+<section id="section-3.2">
+        <h3 id="name-using-resolvers-of-intermed">
+<a href="#section-3.2" class="section-number selfRef">3.2. </a><a href="#name-using-resolvers-of-intermed" class="section-name selfRef">Using resolvers of intermediate reputation</a>
+        </h3>
+<p id="section-3.2-1">If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider.<a href="#section-3.2-1" class="pilcrow">¶</a></p>
+<p id="section-3.2-2">The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.<a href="#section-3.2-2" class="pilcrow">¶</a></p>
+<p id="section-3.2-3">The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to convey information about why the ADN lacks some element of reputation.<a href="#section-3.2-3" class="pilcrow">¶</a></p>
+<p id="section-3.2-4">The client can also use the encrypted service for a limited time, as a means of mitigating. By limiting the DDR response TTL to 5 minutes, a client can ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.<a href="#section-3.2-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="management-of-local-blocking-functionality">
 <section id="section-4">
-      <h2 id="name-naturally-compatible-behavi">
-<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-naturally-compatible-behavi" class="section-name selfRef">Naturally compatible behaviors</a>
+      <h2 id="name-management-of-local-blockin">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-management-of-local-blockin" class="section-name selfRef">Management of local blocking functionality</a>
       </h2>
-<p id="section-4-1">The following system behaviors are naturally compatible with relaxed validation.<a href="#section-4-1" class="pilcrow">¶</a></p>
-<div id="compatible-behaviors-in-the-local-network">
+<p id="section-4-1">Certain local DNS forwarders block access to domains associated with malware and other threats. Others block based on the category of service provided by those domains, e.g. domains hosting services that are not appropriate for a work or school environment. In the short term to ensure this service is not lost due to a cross-forwarder upgrade, the maintainers can simply add "resolver.arpa" to their actively curated list of domains to block. This pattern has been deployed by Mozilla, with the domain "use-application-dns.net" <span>[<a href="#MOZILLA-CANARY" class="xref">MOZILLA-CANARY</a>]</span>.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<p id="section-4-2">In the long term, it is best for filtering DNS forwarders to implement support for encrypted DNS. The following subsections describe some ways to implement this.<a href="#section-4-2" class="pilcrow">¶</a></p>
+<div id="local-implementation-with-dnr">
 <section id="section-4.1">
-        <h3 id="name-compatible-behaviors-in-the">
-<a href="#section-4.1" class="section-number selfRef">4.1. </a><a href="#name-compatible-behaviors-in-the" class="section-name selfRef">Compatible behaviors in the local network</a>
+        <h3 id="name-local-implementation-with-d">
+<a href="#section-4.1" class="section-number selfRef">4.1. </a><a href="#name-local-implementation-with-d" class="section-name selfRef">Local implementation with DNR</a>
         </h3>
-<div id="malware-and-threat-domain-filtering">
-<section id="section-4.1.1">
-          <h4 id="name-malware-and-threat-domain-f">
-<a href="#section-4.1.1" class="section-number selfRef">4.1.1. </a><a href="#name-malware-and-threat-domain-f" class="section-name selfRef">Malware and threat domain filtering</a>
-          </h4>
-<p id="section-4.1.1-1">Certain DNS forwarders block access to domains associated with malware and other threats.  Such threats rely on frequently changing domains, so these forwarders necessarily maintain an actively curated list of domains to block.  To ensure that this service is not lost due to a cross-forwarder upgrade, the maintainers can simply add "resolver.arpa" to the list.<a href="#section-4.1.1-1" class="pilcrow">¶</a></p>
-<p id="section-4.1.1-2">This pattern has been deployed by Mozilla, with the domain "use-application-dns.net" <span>[<a href="#MOZILLA-CANARY" class="xref">MOZILLA-CANARY</a>]</span>.<a href="#section-4.1.1-2" class="pilcrow">¶</a></p>
+<p id="section-4.1-1">The local forwarder can be upgraded to one that implements an encrypted DNS service discoverable through DNR. This requires a TLS certificate on the local device, proving ownership of the chosen Authentication Domain Name (ADN). Onward queries to the internet SHOULD also be protected with encryption.<a href="#section-4.1-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="service-category-restrictions">
-<section id="section-4.1.2">
-          <h4 id="name-service-category-restrictio">
-<a href="#section-4.1.2" class="section-number selfRef">4.1.2. </a><a href="#name-service-category-restrictio" class="section-name selfRef">Service category restrictions</a>
-          </h4>
-<p id="section-4.1.2-1">Certain DNS forwarders may block access to domains based on the category of service provided by those domains, e.g. domains hosting services that are not appropriate for a work or school environment.  As in the previous section, this requires an actively curated list of domains, because the set of domains that offer a given type of service is constantly changing.  An actively managed blocking list can easily be revised to include "resolver.arpa".<a href="#section-4.1.2-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="time-of-use-restrictions">
-<section id="section-4.1.3">
-          <h4 id="name-time-of-use-restrictions">
-<a href="#section-4.1.3" class="section-number selfRef">4.1.3. </a><a href="#name-time-of-use-restrictions" class="section-name selfRef">Time of use restrictions</a>
-          </h4>
-<p id="section-4.1.3-1">Certain networks may impose restrictions on the time or duration of use by certain users.  This behavior is necessarily implemented below the DNS layer, because DNS-based blocking would be ineffective due to stub resolver caching, so it is not affected by changes in the DNS resolver.<a href="#section-4.1.3-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-</section>
-</div>
-<div id="upstream-resolver-services">
+<div id="local-implementation-with-ddr">
 <section id="section-4.2">
-        <h3 id="name-upstream-resolver-services">
-<a href="#section-4.2" class="section-number selfRef">4.2. </a><a href="#name-upstream-resolver-services" class="section-name selfRef">Upstream resolver services</a>
+        <h3 id="name-local-implementation-with-dd">
+<a href="#section-4.2" class="section-number selfRef">4.2. </a><a href="#name-local-implementation-with-dd" class="section-name selfRef">Local implementation with DDR</a>
         </h3>
-<p id="section-4.2-1">The forwarder's upstream resolver might provide additional services, such as filtering.  These services are generally independent of cross-forwarder upgrade, and hence naturally compatible.<a href="#section-4.2-1" class="pilcrow">¶</a></p>
-<p id="section-4.2-2">In special cases where the upstream resolver requires cooperation from a legacy forwarder (e.g. for marking certain queries), one solution is for the upstream resolver to choose not to deploy DDR until all cooperating forwarders have been upgraded.  Alternatively, each legacy forwarder can block "resolver.arpa" as described above.<a href="#section-4.2-2" class="pilcrow">¶</a></p>
+<p id="section-4.2-1">If the local forwarder can be upgraded to offer an encrypted DNS service, this can then be made discoverable through classic DDR. If the device has a private IP (as presumed for RVS), a self-signed certificate is sufficient as long as the client supports the Opportunistic Discovery mode of DDR. Onward queries to the internet SHOULD also be protected with encryption.<a href="#section-4.2-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="move-upstream">
+<section id="section-4.3">
+        <h3 id="name-move-upstream">
+<a href="#section-4.3" class="section-number selfRef">4.3. </a><a href="#name-move-upstream" class="section-name selfRef">Move upstream</a>
+        </h3>
+<p id="section-4.3-1">The blocking functionality can be moved to the upstream resolver. Cross-forwarder upgrade then enables the service to continue, as long as the upstream resolver has sufficient reputation.<a href="#section-4.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
 </div>
-<div id="privacy-considerations">
+<div id="other-issues-that-can-arise-from-cross-forwarder-upgrade">
 <section id="section-5">
-      <h2 id="name-privacy-considerations">
-<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
+      <h2 id="name-other-issues-that-can-arise">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-other-issues-that-can-arise" class="section-name selfRef">Other issues that can arise from cross-forwarder upgrade</a>
       </h2>
-<p id="section-5-1">The conservative validation policy results in no encryption when a legacy DNS forwarder is present.  This leaves the user's query activity vulnerable to passive monitoring <span>[<a href="#RFC7258" class="xref">RFC7258</a>]</span>, either on the local network or between the user and the upstream resolver.<a href="#section-5-1" class="pilcrow">¶</a></p>
-<p id="section-5-2">The relaxed validation policy allows the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.<a href="#section-5-2" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="security-considerations">
-<section id="section-6">
-      <h2 id="name-security-considerations">
-<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
-      </h2>
-<p id="section-6-1">When the client uses the conservative validation policy described in <span>[<a href="#DDR" class="xref">DDR</a>]</span>, and a DDR-enabled resolver is identified by a private IP address, the client can establish a secure DDR connection only in the absence of an active attacker.  An on-path attacker can impersonate the resolver and intercept all queries, by preventing the DDR upgrade or advertising their own DDR endpoint.<a href="#section-6-1" class="pilcrow">¶</a></p>
-<p id="section-6-2">These basic security properties also apply if the client uses the relaxed validation policy described in <a href="#client-policy" class="xref">Section 3</a>.  Nonetheless, there are some subtle but important differences in the security properties of these two policies.<a href="#section-6-2" class="pilcrow">¶</a></p>
-<div id="transient-attackers">
-<section id="section-6.1">
-        <h3 id="name-transient-attackers">
-<a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-transient-attackers" class="section-name selfRef">Transient attackers</a>
-        </h3>
-<p id="section-6.1-1">With the conservative validation policy, a transient on-path attacker can only intercept queries for the duration of their active presence on the network, because the client will only send queries to the original (private) server IP address.<a href="#section-6.1-1" class="pilcrow">¶</a></p>
-<p id="section-6.1-2">With the relaxed validation behavior, a transient on-path attacker could implant a long-lived DDR response in the client's cache, directing its queries to an attacker-controlled server on the public internet.  This would allow the attack to continue long after the attacker has left the network.<a href="#section-6.1-2" class="pilcrow">¶</a></p>
-<p id="section-6.1-3">Solving or mitigating this attack is of great importance for the user's security.<a href="#section-6.1-3" class="pilcrow">¶</a></p>
-<div id="solution-dnr">
-<section id="section-6.1.1">
-          <h4 id="name-solution-dnr">
-<a href="#section-6.1.1" class="section-number selfRef">6.1.1. </a><a href="#name-solution-dnr" class="section-name selfRef">Solution: DNR</a>
-          </h4>
-<p id="section-6.1.1-1">This attack does not apply if the client and network implement support for Discovery of Network-designated Resolvers, as that mechanism takes precedence over DDR (see <span><a href="https://datatracker.ietf.org/doc/html/draft-ietf-add-dnr-02#section-3.2" class="relref">Section 3.2</a> of [<a href="#DNR" class="xref">DNR</a>]</span>).<a href="#section-6.1.1-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="mitigation-frequent-refresh">
-<section id="section-6.1.2">
-          <h4 id="name-mitigation-frequent-refresh">
-<a href="#section-6.1.2" class="section-number selfRef">6.1.2. </a><a href="#name-mitigation-frequent-refresh" class="section-name selfRef">Mitigation: Frequent refresh</a>
-          </h4>
-<p id="section-6.1.2-1">The client can choose to refresh the DDR record arbitrarily frequently, e.g. by limiting the TTL.  For example, by limiting the TTL to 5 minutes, a client could ensure that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.<a href="#section-6.1.2-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="reputation">
-<section id="section-6.1.3">
-          <h4 id="name-mitigation-resolver-reputat">
-<a href="#section-6.1.3" class="section-number selfRef">6.1.3. </a><a href="#name-mitigation-resolver-reputat" class="section-name selfRef">Mitigation: Resolver reputation</a>
-          </h4>
-<p id="section-6.1.3-1">A relaxed-validation client might choose to accept a potential cross-forwarder upgrade only if the designated encrypted resolver has sufficient reputation, according to some proprietary reputation scheme (e.g. a locally stored list of respectable resolvers).  This limits the ability of a DDR forgery attack to cause harm.<a href="#section-6.1.3-1" class="pilcrow">¶</a></p>
-<p id="section-6.1.3-2">Major DoH client implementations already include lists of known resolvers <span>[<a href="#CHROME-DOH" class="xref">CHROME-DOH</a>]</span><span>[<a href="#MICROSOFT-DOH" class="xref">MICROSOFT-DOH</a>]</span><span>[<a href="#MOZILLA-TRR" class="xref">MOZILLA-TRR</a>]</span>.<a href="#section-6.1.3-2" class="pilcrow">¶</a></p>
-</section>
-</div>
-</section>
-</div>
-<div id="forensic-logging">
-<section id="section-6.2">
-        <h3 id="name-forensic-logging">
-<a href="#section-6.2" class="section-number selfRef">6.2. </a><a href="#name-forensic-logging" class="section-name selfRef">Forensic logging</a>
-        </h3>
-<div id="network-layer-logging">
-<section id="section-6.2.1">
-          <h4 id="name-network-layer-logging">
-<a href="#section-6.2.1" class="section-number selfRef">6.2.1. </a><a href="#name-network-layer-logging" class="section-name selfRef">Network-layer logging</a>
-          </h4>
-<p id="section-6.2.1-1">With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of an active attack.<a href="#section-6.2.1-1" class="pilcrow">¶</a></p>
-<p id="section-6.2.1-2">With the relaxed validation policy, forensic logs must capture a specific packet (the attacker's DDR designation response) to enable retrospective detection.<a href="#section-6.2.1-2" class="pilcrow">¶</a></p>
-<div id="mitigation-log-all-ddr-responses">
-<section id="section-6.2.1.1">
-            <h5 id="name-mitigation-log-all-ddr-resp">
-<a href="#section-6.2.1.1" class="section-number selfRef">6.2.1.1. </a><a href="#name-mitigation-log-all-ddr-resp" class="section-name selfRef">Mitigation: Log all DDR responses</a>
-            </h5>
-<p id="section-6.2.1.1-1">Network-layer forensic logs that are not integrated with the resolver can enable detection of these attacks by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.<a href="#section-6.2.1.1-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-</section>
-</div>
-<div id="dns-layer-logging">
-<section id="section-6.2.2">
-          <h4 id="name-dns-layer-logging">
-<a href="#section-6.2.2" class="section-number selfRef">6.2.2. </a><a href="#name-dns-layer-logging" class="section-name selfRef">DNS-layer logging</a>
-          </h4>
-<p id="section-6.2.2-1">DNS-layer forensic logging conducted by a legacy DNS forwarder would be lost in a cross-forwarder upgrade.<a href="#section-6.2.2-1" class="pilcrow">¶</a></p>
-<div id="solution-respond-for-resolverarpa">
-<section id="section-6.2.2.1">
-            <h5 id="name-solution-respond-for-resolv">
-<a href="#section-6.2.2.1" class="section-number selfRef">6.2.2.1. </a><a href="#name-solution-respond-for-resolv" class="section-name selfRef">Solution: Respond for resolver.arpa</a>
-            </h5>
-<p id="section-6.2.2.1-1">Forwarders that want to observe all queries from relaxed validation clients will have to synthesize their own response for resolver.arpa, either implementing DDR or disabling it.<a href="#section-6.2.2.1-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-</section>
-</div>
-</section>
-</div>
-</section>
-</div>
-<div id="compatibility-considerations">
-<section id="section-7">
-      <h2 id="name-compatibility-consideration">
-<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-compatibility-consideration" class="section-name selfRef">Compatibility Considerations</a>
-      </h2>
-<p id="section-7-1">Using DDR with legacy DNS forwarders also raises several potential concerns related to loss of existing network services.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-5-1">There are a small number of other issues to be aware of. For all these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.<a href="#section-5-1" class="pilcrow">¶</a></p>
 <div id="split-horizon-namespaces">
-<section id="section-7.1">
+<section id="section-5.1">
         <h3 id="name-split-horizon-namespaces">
-<a href="#section-7.1" class="section-number selfRef">7.1. </a><a href="#name-split-horizon-namespaces" class="section-name selfRef">Split-horizon namespaces</a>
+<a href="#section-5.1" class="section-number selfRef">5.1. </a><a href="#name-split-horizon-namespaces" class="section-name selfRef">Split-horizon namespaces</a>
         </h3>
-<p id="section-7.1-1">Some network resolvers contain additional names that are not resolvable in the global DNS.  If these local resolvers are also legacy DNS forwarders, a client that performs a cross-forwarder upgrade might lose access to these local names.<a href="#section-7.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.1-1">Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients should be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
 <div id="mitigation-nxdomain-fallback">
-<section id="section-7.1.1">
+<section id="section-5.1.1">
           <h4 id="name-mitigation-nxdomain-fallbac">
-<a href="#section-7.1.1" class="section-number selfRef">7.1.1. </a><a href="#name-mitigation-nxdomain-fallbac" class="section-name selfRef">Mitigation: NXDOMAIN Fallback</a>
+<a href="#section-5.1.1" class="section-number selfRef">5.1.1. </a><a href="#name-mitigation-nxdomain-fallbac" class="section-name selfRef">Mitigation: NXDOMAIN Fallback</a>
           </h4>
-<p id="section-7.1.1-1">In "NXDOMAIN Fallback", the client repeats a query to the unencrypted resolver if the encrypted resolver returns NXDOMAIN.  This allows the resolution of local names, provided they do not collide with globally resolvable names (as required by <span>[<a href="#RFC2826" class="xref">RFC2826</a>]</span>).<a href="#section-7.1.1-1" class="pilcrow">¶</a></p>
-<p id="section-7.1.1-2">This is similar to the fallback behavior currently deployed in Mozilla Firefox <span>[<a href="#FIREFOX-FALLBACK" class="xref">FIREFOX-FALLBACK</a>]</span>.<a href="#section-7.1.1-2" class="pilcrow">¶</a></p>
-<p id="section-7.1.1-3">NXDOMAIN Fallback results in slight changes to the security and privacy properties of encrypted DNS.  Queries for nonexistent names no longer have protection against a local passive adversary, and local names are revealed to the upstream resolver.<a href="#section-7.1.1-3" class="pilcrow">¶</a></p>
-<p id="section-7.1.1-4">NXDOMAIN Fallback is only applicable when a legacy DNS forwarder might be present, i.e. the unencrypted resolver has a private IP address, and the encrypted resolver has a different IP address.  In the other DDR configurations, any local names are expected to resolve similarly on both resolvers.<a href="#section-7.1.1-4" class="pilcrow">¶</a></p>
+<p id="section-5.1.1-1">In "NXDOMAIN Fallback", the client repeats a query to the unencrypted resolver if the encrypted resolver returns NXDOMAIN.  This allows the resolution of local names, provided they do not collide with globally resolvable names (as required by <span>[<a href="#RFC2826" class="xref">RFC2826</a>]</span>).<a href="#section-5.1.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.1.1-2">This is similar to the fallback behavior currently deployed in Mozilla Firefox <span>[<a href="#FIREFOX-FALLBACK" class="xref">FIREFOX-FALLBACK</a>]</span>.<a href="#section-5.1.1-2" class="pilcrow">¶</a></p>
+<p id="section-5.1.1-3">NXDOMAIN Fallback results in slight changes to the security and privacy properties of encrypted DNS.  Queries for nonexistent names no longer have protection against a local passive adversary, and local names are revealed to the upstream resolver.<a href="#section-5.1.1-3" class="pilcrow">¶</a></p>
+<p id="section-5.1.1-4">NXDOMAIN Fallback is only applicable when a legacy DNS forwarder might be present, i.e. the unencrypted resolver has a private IP address, and the encrypted resolver has a different IP address.  In other DDR configurations, any local names are expected to resolve similarly on both resolvers.<a href="#section-5.1.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
 </div>
 <div id="interposable-domains">
-<section id="section-7.2">
+<section id="section-5.2">
         <h3 id="name-interposable-domains">
-<a href="#section-7.2" class="section-number selfRef">7.2. </a><a href="#name-interposable-domains" class="section-name selfRef">Interposable domains</a>
+<a href="#section-5.2" class="section-number selfRef">5.2. </a><a href="#name-interposable-domains" class="section-name selfRef">Interposable domains</a>
         </h3>
-<p id="section-7.2-1">An "interposable domain" is a domain whose owner deliberately allows resolvers to forge certain responses.  This arrangement is most common for search engines, which often support a configuration where resolvers forge a CNAME record to direct all clients to a child-appropriate instance of the search engine <span>[<a href="#DUCK-CNAME" class="xref">DUCK-CNAME</a>]</span><span>[<a href="#BING-CNAME" class="xref">BING-CNAME</a>]</span><span>[<a href="#GOOGLE-CNAME" class="xref">GOOGLE-CNAME</a>]</span>.<a href="#section-7.2-1" class="pilcrow">¶</a></p>
-<p id="section-7.2-2">Future deployments of interposable domains can instruct administrators to enable or disable DDR when adding the forged record, but forged records in legacy DNS forwarders could be lost due to a cross-forwarder upgrade.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
+<p id="section-5.2-1">An "interposable domain" is a domain whose owner deliberately allows resolvers to forge certain responses.  This arrangement is most common for search engines, which often support a configuration where resolvers forge a CNAME record to direct all clients to a child-appropriate instance of the search engine <span>[<a href="#DUCK-CNAME" class="xref">DUCK-CNAME</a>]</span><span>[<a href="#BING-CNAME" class="xref">BING-CNAME</a>]</span><span>[<a href="#GOOGLE-CNAME" class="xref">GOOGLE-CNAME</a>]</span>.<a href="#section-5.2-1" class="pilcrow">¶</a></p>
+<p id="section-5.2-2">Future deployments of interposable domains can instruct administrators to enable or disable DDR when adding the forged record, but forged records in legacy DNS forwarders could be lost due to a cross-forwarder upgrade.<a href="#section-5.2-2" class="pilcrow">¶</a></p>
 <div id="mitigation-exemption-list">
-<section id="section-7.2.1">
+<section id="section-5.2.1">
           <h4 id="name-mitigation-exemption-list">
-<a href="#section-7.2.1" class="section-number selfRef">7.2.1. </a><a href="#name-mitigation-exemption-list" class="section-name selfRef">Mitigation: Exemption list</a>
+<a href="#section-5.2.1" class="section-number selfRef">5.2.1. </a><a href="#name-mitigation-exemption-list" class="section-name selfRef">Mitigation: Exemption list</a>
           </h4>
-<p id="section-7.2.1-1">There are a small number of pre-existing interposable domains, largely of interest only to web browsers.  Clients can maintain a list of relevant interposable domains and resolve them only via the network's resolver.<a href="#section-7.2.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.2.1-1">There are a small number of pre-existing interposable domains, largely of interest only to web browsers.  Clients can maintain a list of relevant interposable domains and resolve them only via the network's resolver.<a href="#section-5.2.1-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
 </div>
 <div id="caching">
-<section id="section-7.3">
+<section id="section-5.3">
         <h3 id="name-caching">
-<a href="#section-7.3" class="section-number selfRef">7.3. </a><a href="#name-caching" class="section-name selfRef">Caching</a>
+<a href="#section-5.3" class="section-number selfRef">5.3. </a><a href="#name-caching" class="section-name selfRef">Caching</a>
         </h3>
-<p id="section-7.3-1">Some legacy DNS forwarders also provide a shared cache for all network users.  Cross-forwarder upgrades will bypass this cache, resulting in slower DNS resolution.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
+<p id="section-5.3-1">Many legacy DNS forwarders also provide a shared cache for all network users. Cross-forwarder upgrades will bypass this cache, resulting in slower DNS resolution for some queries.<a href="#section-5.3-1" class="pilcrow">¶</a></p>
 <div id="mitigation-stub-caches">
-<section id="section-7.3.1">
+<section id="section-5.3.1">
           <h4 id="name-mitigation-stub-caches">
-<a href="#section-7.3.1" class="section-number selfRef">7.3.1. </a><a href="#name-mitigation-stub-caches" class="section-name selfRef">Mitigation: Stub caches</a>
+<a href="#section-5.3.1" class="section-number selfRef">5.3.1. </a><a href="#name-mitigation-stub-caches" class="section-name selfRef">Mitigation: Stub caches</a>
           </h4>
-<p id="section-7.3.1-1">Clients can compensate partially for any loss of shared caching by implementing local DNS caches.  This mitigation is already widely deployed in browsers and operating systems.<a href="#section-7.3.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.3.1-1">Clients can compensate partially for any loss of shared caching by implementing local DNS caches.  This mitigation is already widely deployed in browsers and operating systems.<a href="#section-5.3.1-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
 </div>
-<div id="user-controls">
-<section id="section-7.4">
-        <h3 id="name-general-mitigation-user-con">
-<a href="#section-7.4" class="section-number selfRef">7.4. </a><a href="#name-general-mitigation-user-con" class="section-name selfRef">General mitigation: User controls</a>
+</section>
+</div>
+<div id="privacy-considerations">
+<section id="section-6">
+      <h2 id="name-privacy-considerations">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
+      </h2>
+<p id="section-6-1">The conservative validation policy results in no encryption when a legacy DNS forwarder is present.  This leaves the user's query activity vulnerable to passive monitoring <span>[<a href="#RFC7258" class="xref">RFC7258</a>]</span>, either on the local network or between the user and the upstream resolver.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<p id="section-6-2">Reputation Validated Selection enables the use of encrypted transport in these configurations, reducing exposure to a passive surveillance adversary.<a href="#section-6-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="security-considerations">
+<section id="section-7">
+      <h2 id="name-security-considerations">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<p id="section-7-1">When the client uses the conservative validation policy described in <span>[<a href="#DDR" class="xref">DDR</a>]</span>, the client can establish a secure DDR connection only in the absence of an active attacker.  An on-path attacker can impersonate the resolver and intercept all queries, by preventing the DDR upgrade.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-2">This basic security property also applies if the client uses reputation validated selection, but an additional one is added.<a href="#section-7-2" class="pilcrow">¶</a></p>
+<div id="redirection">
+<section id="section-7.1">
+        <h3 id="name-redirection">
+<a href="#section-7.1" class="section-number selfRef">7.1. </a><a href="#name-redirection" class="section-name selfRef">Redirection</a>
         </h3>
-<p id="section-7.4-1">For these and other compatibility concerns, a possible mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders.  For example, this control could be provided via a general preference, or via a notification upon discovering a new upstream resolver.<a href="#section-7.4-1" class="pilcrow">¶</a></p>
+<p id="section-7.1-1">An on-path attacker might be located on the local network, or between the local network and the upstream resolver. In either case, the attacker can redirect the client to a resolver of the attacker's choice, /as long as that resolver meets the client's requirements for reputation/. Hence the reputation system is essential to the security of the user. If a previously-reputable resolver is compromised, users can be redirected to it while this reputation remains high.<a href="#section-7.1-1" class="pilcrow">¶</a></p>
+<div id="mitigation-reputation-update">
+<section id="section-7.1.1">
+          <h4 id="name-mitigation-reputation-updat">
+<a href="#section-7.1.1" class="section-number selfRef">7.1.1. </a><a href="#name-mitigation-reputation-updat" class="section-name selfRef">Mitigation: Reputation update</a>
+          </h4>
+<p id="section-7.1.1-1">Once an attack has been detected, it should be reported to relevant reputation services so that they can revise their assessment of the ADN.<a href="#section-7.1.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="forensic-logging">
+<section id="section-7.2">
+        <h3 id="name-forensic-logging">
+<a href="#section-7.2" class="section-number selfRef">7.2. </a><a href="#name-forensic-logging" class="section-name selfRef">Forensic logging</a>
+        </h3>
+<div id="network-layer-logging">
+<section id="section-7.2.1">
+          <h4 id="name-network-layer-logging">
+<a href="#section-7.2.1" class="section-number selfRef">7.2.1. </a><a href="#name-network-layer-logging" class="section-name selfRef">Network-layer logging</a>
+          </h4>
+<p id="section-7.2.1-1">With the conservative validation policy, a random sample of IP packets is likely sufficient for manual retrospective detection of an active attack.<a href="#section-7.2.1-1" class="pilcrow">¶</a></p>
+<p id="section-7.2.1-2">With reputation verified selection, forensic logs must capture a specific packet (the attacker's DDR designation response) to enable retrospective detection.<a href="#section-7.2.1-2" class="pilcrow">¶</a></p>
+<div id="mitigation-log-all-ddr-responses">
+<section id="section-7.2.1.1">
+            <h5 id="name-mitigation-log-all-ddr-resp">
+<a href="#section-7.2.1.1" class="section-number selfRef">7.2.1.1. </a><a href="#name-mitigation-log-all-ddr-resp" class="section-name selfRef">Mitigation: Log all DDR responses</a>
+            </h5>
+<p id="section-7.2.1.1-1">Network-layer forensic logs that are not integrated with the resolver can enable detection of these attacks by logging all DDR responses, or more generally all DNS responses.  This makes retrospective attack detection straightforward, as the attacker's DDR response will indicate an unexpected server.<a href="#section-7.2.1.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="dns-layer-logging">
+<section id="section-7.2.2">
+          <h4 id="name-dns-layer-logging">
+<a href="#section-7.2.2" class="section-number selfRef">7.2.2. </a><a href="#name-dns-layer-logging" class="section-name selfRef">DNS-layer logging</a>
+          </h4>
+<p id="section-7.2.2-1">DNS-layer forensic logging conducted by a legacy DNS forwarder would be lost in a cross-forwarder upgrade.<a href="#section-7.2.2-1" class="pilcrow">¶</a></p>
+<div id="solution-plan-to-upgrade">
+<section id="section-7.2.2.1">
+            <h5 id="name-solution-plan-to-upgrade">
+<a href="#section-7.2.2.1" class="section-number selfRef">7.2.2.1. </a><a href="#name-solution-plan-to-upgrade" class="section-name selfRef">Solution: Plan to upgrade</a>
+            </h5>
+<p id="section-7.2.2.1-1">Forwarders that want to observe all queries from RVS clients should plan to implement DDR or DNR. In the short term it is possible for the forwarder to disable DDR by responding negatively to _dns.resolver.arpa but this is not recommended long-term as it prevents confidentiality protection.<a href="#section-7.2.2.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="per-device-observation">
+<section id="section-7.3">
+        <h3 id="name-per-device-observation">
+<a href="#section-7.3" class="section-number selfRef">7.3. </a><a href="#name-per-device-observation" class="section-name selfRef">Per-device observation</a>
+        </h3>
+<p id="section-7.3-1">With Do53 to a legacy DNS forwarder, an on-path attacker located between the local network and the upstream resolver is not directly aware of how many devices are making DNS queries behind the forwarder. It can only see aggregated queries being made by the forwarder. <span>[<a href="#DDR" class="xref">DDR</a>]</span> to a non-local resolver permits the attacker to become aware of the individual encrypted DNS connections from each device, noting how many there are and the relative number of queries/responses made for each. RVS shares this property.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
+<div id="mitigation-open-multiple-connections">
+<section id="section-7.3.1">
+          <h4 id="name-mitigation-open-multiple-co">
+<a href="#section-7.3.1" class="section-number selfRef">7.3.1. </a><a href="#name-mitigation-open-multiple-co" class="section-name selfRef">Mitigation: Open multiple connections</a>
+          </h4>
+<p id="section-7.3.1-1">If the above issue is a concern, clients may wish to open a random number of connections to the designed encrypted resolver and distribute queries among them. This may lead the attacker to assume a larger number of devices than are actually present.<a href="#section-7.3.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 </section>
@@ -1530,11 +1540,7 @@ svg [stroke="fill"], svg [fill^="#fff"] {
 <dd class="break"></dd>
 <dt id="DDR">[DDR]</dt>
       <dd>
-<span class="refAuthor">Pauly, T.</span>, <span class="refAuthor">Kinnear, E.</span>, <span class="refAuthor">Wood, C. A.</span>, <span class="refAuthor">McManus, P.</span>, and <span class="refAuthor">T. Jensen</span>, <span class="refTitle">"Discovery of Designated Resolvers"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-add-ddr-03</span>, <time datetime="2021-10-01" class="refDate">1 October 2021</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-add-ddr-03">https://datatracker.ietf.org/doc/html/draft-ietf-add-ddr-03</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="DNR">[DNR]</dt>
-      <dd>
-<span class="refAuthor">Boucadair, M.</span>, <span class="refAuthor">Reddy, T.</span>, <span class="refAuthor">Wing, D.</span>, <span class="refAuthor">Cook, N.</span>, and <span class="refAuthor">T. Jensen</span>, <span class="refTitle">"DHCP and Router Advertisement Options for the Discovery of Network-designated Resolvers (DNR)"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-add-dnr-02</span>, <time datetime="2021-05-17" class="refDate">17 May 2021</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-add-dnr-02">https://datatracker.ietf.org/doc/html/draft-ietf-add-dnr-02</a>&gt;</span>. </dd>
+<span class="refAuthor">Pauly, T.</span>, <span class="refAuthor">Kinnear, E.</span>, <span class="refAuthor">Wood, C. A.</span>, <span class="refAuthor">McManus, P.</span>, and <span class="refAuthor">T. Jensen</span>, <span class="refTitle">"Discovery of Designated Resolvers"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-add-ddr-08</span>, <time datetime="2022-07-05" class="refDate">5 July 2022</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-add-ddr-08">https://datatracker.ietf.org/doc/html/draft-ietf-add-ddr-08</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="DUCK-CNAME">[DUCK-CNAME]</dt>
       <dd>
@@ -1560,37 +1566,37 @@ svg [stroke="fill"], svg [fill^="#fff"] {
       <dd>
 <span class="refTitle">"Mozilla Policy Requirements for DNS over HTTPs Partners"</span>, <span>n.d.</span>, <span>&lt;<a href="https://wiki.mozilla.org/Security/DOH-resolver-policy#Mozilla_Policy_Requirements_for_DNS_over_HTTPs_Partners">https://wiki.mozilla.org/Security/DOH-resolver-policy#Mozilla_Policy_Requirements_for_DNS_over_HTTPs_Partners</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="NEXTDNS">[NEXTDNS]</dt>
+      <dd>
+<span class="refTitle">"NextDNS"</span>, <span>n.d.</span>, <span>&lt;<a href="https://nextdns.io/">https://nextdns.io/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC1122">[RFC1122]</dt>
       <dd>
-<span class="refAuthor">Braden, R., Ed.</span>, <span class="refTitle">"Requirements for Internet Hosts - Communication Layers"</span>, <span class="seriesInfo">STD 3</span>, <span class="seriesInfo">RFC 1122</span>, <span class="seriesInfo">DOI 10.17487/RFC1122</span>, <time datetime="1989-10" class="refDate">October 1989</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc1122">https://datatracker.ietf.org/doc/html/rfc1122</a>&gt;</span>. </dd>
+<span class="refAuthor">Braden, R., Ed.</span>, <span class="refTitle">"Requirements for Internet Hosts - Communication Layers"</span>, <span class="seriesInfo">STD 3</span>, <span class="seriesInfo">RFC 1122</span>, <span class="seriesInfo">DOI 10.17487/RFC1122</span>, <time datetime="1989-10" class="refDate">October 1989</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc1122">https://www.rfc-editor.org/rfc/rfc1122</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC1918">[RFC1918]</dt>
       <dd>
-<span class="refAuthor">Rekhter, Y.</span>, <span class="refAuthor">Moskowitz, B.</span>, <span class="refAuthor">Karrenberg, D.</span>, <span class="refAuthor">de Groot, G. J.</span>, and <span class="refAuthor">E. Lear</span>, <span class="refTitle">"Address Allocation for Private Internets"</span>, <span class="seriesInfo">BCP 5</span>, <span class="seriesInfo">RFC 1918</span>, <span class="seriesInfo">DOI 10.17487/RFC1918</span>, <time datetime="1996-02" class="refDate">February 1996</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc1918">https://datatracker.ietf.org/doc/html/rfc1918</a>&gt;</span>. </dd>
+<span class="refAuthor">Rekhter, Y.</span>, <span class="refAuthor">Moskowitz, B.</span>, <span class="refAuthor">Karrenberg, D.</span>, <span class="refAuthor">de Groot, G. J.</span>, and <span class="refAuthor">E. Lear</span>, <span class="refTitle">"Address Allocation for Private Internets"</span>, <span class="seriesInfo">BCP 5</span>, <span class="seriesInfo">RFC 1918</span>, <span class="seriesInfo">DOI 10.17487/RFC1918</span>, <time datetime="1996-02" class="refDate">February 1996</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc1918">https://www.rfc-editor.org/rfc/rfc1918</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC2826">[RFC2826]</dt>
       <dd>
-<span class="refAuthor">Internet Architecture Board</span>, <span class="refTitle">"IAB Technical Comment on the Unique DNS Root"</span>, <span class="seriesInfo">RFC 2826</span>, <span class="seriesInfo">DOI 10.17487/RFC2826</span>, <time datetime="2000-05" class="refDate">May 2000</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc2826">https://datatracker.ietf.org/doc/html/rfc2826</a>&gt;</span>. </dd>
+<span class="refAuthor">Internet Architecture Board</span>, <span class="refTitle">"IAB Technical Comment on the Unique DNS Root"</span>, <span class="seriesInfo">RFC 2826</span>, <span class="seriesInfo">DOI 10.17487/RFC2826</span>, <time datetime="2000-05" class="refDate">May 2000</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc2826">https://www.rfc-editor.org/rfc/rfc2826</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC3927">[RFC3927]</dt>
       <dd>
-<span class="refAuthor">Cheshire, S.</span>, <span class="refAuthor">Aboba, B.</span>, and <span class="refAuthor">E. Guttman</span>, <span class="refTitle">"Dynamic Configuration of IPv4 Link-Local Addresses"</span>, <span class="seriesInfo">RFC 3927</span>, <span class="seriesInfo">DOI 10.17487/RFC3927</span>, <time datetime="2005-05" class="refDate">May 2005</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc3927">https://datatracker.ietf.org/doc/html/rfc3927</a>&gt;</span>. </dd>
+<span class="refAuthor">Cheshire, S.</span>, <span class="refAuthor">Aboba, B.</span>, and <span class="refAuthor">E. Guttman</span>, <span class="refTitle">"Dynamic Configuration of IPv4 Link-Local Addresses"</span>, <span class="seriesInfo">RFC 3927</span>, <span class="seriesInfo">DOI 10.17487/RFC3927</span>, <time datetime="2005-05" class="refDate">May 2005</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3927">https://www.rfc-editor.org/rfc/rfc3927</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC4193">[RFC4193]</dt>
       <dd>
-<span class="refAuthor">Hinden, R.</span> and <span class="refAuthor">B. Haberman</span>, <span class="refTitle">"Unique Local IPv6 Unicast Addresses"</span>, <span class="seriesInfo">RFC 4193</span>, <span class="seriesInfo">DOI 10.17487/RFC4193</span>, <time datetime="2005-10" class="refDate">October 2005</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc4193">https://datatracker.ietf.org/doc/html/rfc4193</a>&gt;</span>. </dd>
+<span class="refAuthor">Hinden, R.</span> and <span class="refAuthor">B. Haberman</span>, <span class="refTitle">"Unique Local IPv6 Unicast Addresses"</span>, <span class="seriesInfo">RFC 4193</span>, <span class="seriesInfo">DOI 10.17487/RFC4193</span>, <time datetime="2005-10" class="refDate">October 2005</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc4193">https://www.rfc-editor.org/rfc/rfc4193</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC6598">[RFC6598]</dt>
       <dd>
-<span class="refAuthor">Weil, J.</span>, <span class="refAuthor">Kuarsingh, V.</span>, <span class="refAuthor">Donley, C.</span>, <span class="refAuthor">Liljenstolpe, C.</span>, and <span class="refAuthor">M. Azinger</span>, <span class="refTitle">"IANA-Reserved IPv4 Prefix for Shared Address Space"</span>, <span class="seriesInfo">BCP 153</span>, <span class="seriesInfo">RFC 6598</span>, <span class="seriesInfo">DOI 10.17487/RFC6598</span>, <time datetime="2012-04" class="refDate">April 2012</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc6598">https://datatracker.ietf.org/doc/html/rfc6598</a>&gt;</span>. </dd>
+<span class="refAuthor">Weil, J.</span>, <span class="refAuthor">Kuarsingh, V.</span>, <span class="refAuthor">Donley, C.</span>, <span class="refAuthor">Liljenstolpe, C.</span>, and <span class="refAuthor">M. Azinger</span>, <span class="refTitle">"IANA-Reserved IPv4 Prefix for Shared Address Space"</span>, <span class="seriesInfo">BCP 153</span>, <span class="seriesInfo">RFC 6598</span>, <span class="seriesInfo">DOI 10.17487/RFC6598</span>, <time datetime="2012-04" class="refDate">April 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6598">https://www.rfc-editor.org/rfc/rfc6598</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC7258">[RFC7258]</dt>
-      <dd>
-<span class="refAuthor">Farrell, S.</span> and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Pervasive Monitoring Is an Attack"</span>, <span class="seriesInfo">BCP 188</span>, <span class="seriesInfo">RFC 7258</span>, <span class="seriesInfo">DOI 10.17487/RFC7258</span>, <time datetime="2014-05" class="refDate">May 2014</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc7258">https://datatracker.ietf.org/doc/html/rfc7258</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC7858">[RFC7858]</dt>
     <dd>
-<span class="refAuthor">Hu, Z.</span>, <span class="refAuthor">Zhu, L.</span>, <span class="refAuthor">Heidemann, J.</span>, <span class="refAuthor">Mankin, A.</span>, <span class="refAuthor">Wessels, D.</span>, and <span class="refAuthor">P. Hoffman</span>, <span class="refTitle">"Specification for DNS over Transport Layer Security (TLS)"</span>, <span class="seriesInfo">RFC 7858</span>, <span class="seriesInfo">DOI 10.17487/RFC7858</span>, <time datetime="2016-05" class="refDate">May 2016</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/rfc7858">https://datatracker.ietf.org/doc/html/rfc7858</a>&gt;</span>. </dd>
+<span class="refAuthor">Farrell, S.</span> and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Pervasive Monitoring Is an Attack"</span>, <span class="seriesInfo">BCP 188</span>, <span class="seriesInfo">RFC 7258</span>, <span class="seriesInfo">DOI 10.17487/RFC7258</span>, <time datetime="2014-05" class="refDate">May 2014</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7258">https://www.rfc-editor.org/rfc/rfc7258</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>
@@ -1599,7 +1605,7 @@ svg [stroke="fill"], svg [fill^="#fff"] {
       <h2 id="name-acknowledgments">
 <a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
       </h2>
-<p id="appendix-A-1">Thanks to Anthony Lieuallen and Eric Orth for early reviews.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
+<p id="appendix-A-1">Thanks to Anthony Lieuallen and Eric Orth for early reviews of a previous draft.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="authors-addresses">
