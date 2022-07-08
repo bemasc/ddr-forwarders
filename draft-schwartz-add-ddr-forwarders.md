@@ -130,13 +130,11 @@ Embedding a list of known trusted resolvers in a client is only one possible mod
 
 ## Using resolvers of intermediate reputation
 
-If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider.
+If the determined reputation is a binary "definitely trustworthy" or "definitely malicious", the client's recommended action is clear. However, intermediate trust levels are also possible (e.g. "probably safe", "newly launched"). In these cases there are some options clients can consider:
 
-The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.
-
-The client can ask the user about specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to present more details about why a Resolver Identity lacks some element of reputation.
-
-The client can also use the encrypted service for a limited time, as a means of mitigating interception attacks.  For example, if the client limiting the DDR response TTL to 5 minutes, this ensures that any attacker can continue to monitor queries for at most 5 minutes after they have left the local network.
+* The client can simply decline to the use the encrypted service. In this case, unless there is another option, the client will fall back to Do53.
+* The client can ask the user about a specific domain names that appear in the certificate. These names might be recognizable to the user, e.g. as that of an ISP. It's also possible to present more details about why a Resolver Identity lacks some element of reputation.
+* The client can use the encrypted service for a limited time, as a means of mitigating interception attacks.  For example, if the client limits the DDR response TTL to 5 minutes, this ensures that any attacker can continue to redirect queries for at most 5 minutes after they have left the local network.
 
 # Management of local blocking functionality
 
@@ -156,13 +154,13 @@ If the local forwarder can be upgraded to offer an encrypted DNS service, this c
 
 The blocking functionality can be moved to the upstream resolver. Cross-forwarder upgrade then enables the service to continue, as long as the upstream resolver has sufficient reputation.
 
-# Other issues that can arise from cross-forwarder upgrade
+# Compatibility issues that can arise from cross-forwarder upgrade
 
-There are a small number of other issues to be aware of. For all these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.
+Legacy DNS forwarders sometimes provide various additional services that would be lost in the event of a cross-forwarder upgrade. For all of these, a possible general mitigation is to provide users or administrators with the ability to control whether DDR is used with legacy forwarders. For example, this control could be provided via a preference, or via a notification upon discovering a new upstream resolver. Specific mitigations are also described below.
 
 ## Split-horizon namespaces
 
-Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients should be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.
+Some local network resolvers contain additional names that are not resolvable in the global DNS. A simple cross-forwarder upgrade might lose access to these local names. Clients SHOULD be aware of well-known suffixes (e.g. .local, .home.arpa.) that require local resolution. Dynamic discovery of local prefixes would help this issue. To address any remaining ones, the following mitigation can be used.
 
 ### Mitigation: NXDOMAIN Fallback
 
